@@ -77,12 +77,13 @@ jobs:
                 }
               }' > package.json
 
-          # 打包成二进制
-          - name: Package Binary 
-            working-directory: Sub-Store/backend/dist
-            run: |
-              NODE_OPTIONS="--max-old-space-size=4096" pkg . --target node18-linux-arm64 --output MagicSub --debug || true
-              ls -la
+            - name: Package Binary 
+              working-directory: Sub-Store/backend/dist
+              run: |
+                NODE_OPTIONS="--max-old-space-size=4096" pkg . --target node18-linux-arm64 --output MagicSub --debug || true
+                ls -la
+                file MagicSub
+                readelf -h MagicSub || echo "Not an ELF file"
           # 提交更改
           - name: Commit Changes
             run: |
