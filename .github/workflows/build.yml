@@ -4,11 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag'
+        description: '发布标签'
         required: true
+        default: 'v1.0.0'
 
 permissions:
   contents: write
+  packages: write
+  actions: write
 
 env:
   NODE_VERSION: '18.12.1'
@@ -21,43 +24,41 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       
-      - uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: true
-      
-      - uses: actions/setup-node@v3
+      - name: Initialize Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
       
-      - uses: actions/cache@v3
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
         with:
-          path: |
-            ~/.pnpm-store
-            ~/.pkg-cache
-            **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
       
-      - name: Configure pnpm
-        run: pnpm config set strict-peer-dependencies false
-      
-      - name: Setup Environment
+      - name: Create Lock File
         run: |
+          echo '{"name":"magicsub-build","version":"1.0.0"}' > package.json
+          pnpm install --ignore-scripts
+      
+      - name: Setup Build Tools
+        run: |
+          pnpm config set strict-peer-dependencies false
           pnpm add -g pkg
           git clone --depth 1 https://github.com/nodejs-mobile/nodejs-mobile.git
           cd nodejs-mobile
           ./tools/android_build.sh
       
-      - name: Clone and Fix Repositories
+      - name: Clone Repositories
         run: |
           rm -rf Sub-Store Sub-Store-Front-End
           git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git
           git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git
+      
+      - name: Fix Frontend Code
+        run: |
           cd Sub-Store-Front-End
           sed -i 's/watch(list,/watch(() => list,/g' src/views/editor/ActionBlock.vue
       
@@ -97,6 +98,8 @@ jobs:
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.event.inputs.tag }}
           files: Sub-Store/backend/dist/MagicSub
