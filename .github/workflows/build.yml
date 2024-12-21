@@ -100,11 +100,6 @@ jobs:
               files: Sub-Store/backend/dist/MagicSub
               generate_release_notes: true
 
-          - name: Create Release
-            uses: softprops/action-gh-release@v1
-            with:
-              files: Sub-Store/backend/dist/MagicSub
-              generate_release_notes: true
               
           - name: Upload Artifact
             uses: actions/upload-artifact@v3 
