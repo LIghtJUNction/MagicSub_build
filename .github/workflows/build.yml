@@ -19,6 +19,7 @@ env:
   SHELL: '/bin/bash'
   NDK_VERSION: 'r27c'  # 添加 NDK 版本
   API_LEVEL: '34'      # 添加 API level
+  PYTHON_VERSION: '3.11'
 
 jobs:
   build:
@@ -26,6 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Checkout Code
         uses: actions/checkout@v4
       
@@ -50,11 +58,13 @@ jobs:
           ndk-version: ${{ env.NDK_VERSION }}
       - name: Setup Build Tools
         run: |
+          python3 -V
           pnpm config set strict-peer-dependencies false
           pnpm add -g pkg
           git clone --depth 1 https://github.com/nodejs-mobile/nodejs-mobile.git
           cd nodejs-mobile
-          ./tools/android_build.sh $ANDROID_NDK_HOME ${{ env.API_LEVEL }} arm64-v8a
+          python3 ./tools/android_build.sh $ANDROID_NDK_HOME ${{ env.API_LEVEL }} arm64-v8a
+  
   
       - name: Clone Repositories
         run: |
