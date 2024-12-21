@@ -1,183 +1,158 @@
-name: build
+name: Build MagicSub
+
 on:
-    workflow_dispatch:
-    schedule:
-      - cron: '0 0 * * *'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 0点运行
+
 permissions:
   contents: write
+
+env:
+  NODE_VERSION: '18.12'
+  PYTHON_VERSION: '3.10'
+  NDK_VERSION: 'r27c'
+
 jobs:
-    build:
-        name: Build
-        runs-on: ubuntu-latest
-        # 添加缓存配置
-        strategy:
-          matrix:
-            node-version: [18.12]
-        steps:
-          - uses: actions/cache@v3
-            with:
-              path: |
-                ~/.npm
-                ~/.pkg-cache
-                android-ndk-r27c
-              key: ${{ runner.os }}-build-${{ hashFiles('**/package.json') }}
-              
-              
-          - uses: actions/setup-python@v4
-            with:
-             python-version: '3.10'
-          - uses: actions/setup-node@v3
-            with:
-              node-version: '18.12'
-              
-          # 后端构建
-          - name: Checkout Backend
-            run: |
-              sudo apt install git wget -y
-              git clone https://github.com/sub-store-org/Sub-Store.git
-              sed -i 's#https://sub-store.vercel.app/#http://127.0.0.1:3000#g' 'Sub-Store/backend/src/restful/miscs.js'
-              
-          - name: Build Backend
-            run: |
-              npm install -g pnpm pkg
-              cd Sub-Store/backend
-              pnpm i
-              pnpm run build
-              pnpm run bundle
-              
-          # 前端构建  
-          - name: Checkout Frontend
-            run: |
-              git clone https://github.com/sub-store-org/Sub-Store-Front-End.git
-              sed -i 's#https://sub.store#http://127.0.0.1:3000#g' 'Sub-Store-Front-End/.env.production'
-              
-          - name: Build Frontend  
-            run: |
-              cd Sub-Store-Front-End
-              pnpm i
-              pnpm build
-              
-          # 整合前后端
-          - name: Merge Frontend and Backend
-            run: |
-              mkdir -p Sub-Store/backend/dist/public
-              cp -r Sub-Store-Front-End/dist/* Sub-Store/backend/dist/public/
-              
-          # 安装Android NDK
-          - name: Setup Android NDK
-            uses: nttld/setup-ndk@v1
-            with:
-              ndk-version: r27c
-
-          # 配置打包环境
-          - name: Setup Package Config  
-            working-directory: Sub-Store/backend/dist
-            run: |
-              echo '{
-                "name": "magicsub",
-                "main": "./sub-store.bundle.js",
-                "bin": "./sub-store.bundle.js", 
-                "pkg": {
-                  "assets": [
-                    "public/**/*",
-                    "../node_modules/**/*"
-                  ],
-                  "scripts": [
-                    "./sub-store.bundle.js",
-                    "./sub-store-0.min.js",
-                    "./sub-store-1.min.js",
-                    "./sub-store-parser.loon.min.js"
-                  ],
-                  "targets": [
-                    "node18-linux-arm64"
-                  ],
-                  "outputPath": "dist"
-                }
-              }' > package.json
-
-
-          # 打包成二进制
-          - name: Package Binary
-            working-directory: Sub-Store/backend/dist  
-            run: |
-              # 设置环境变量
-              export NODE_OPTIONS="--max-old-space-size=4096"
-              
-              # 打包并输出调试信息
-              pkg . --target node18-linux-arm64 --output temp_binary --debug || {
-                echo "pkg打包失败"
-                ls -la
-                exit 1
-              }
-              # 创建加载器源码
-              cat > loader.c << 'EOF'
-              #include <stdio.h>
-              #include <stdlib.h>
-              #include <unistd.h>
-              #include <sys/mman.h>
-              #include <string.h>  // 添加string.h
-              
-              extern unsigned char binary[];
-              extern size_t binary_len;
-              
-              int main() {
-                void *mem = mmap(NULL, binary_len, PROT_WRITE | PROT_READ,
-                               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-                if (mem == MAP_FAILED) {
-                  perror("mmap failed");  // 添加错误处理
-                  return 1;
-                }
-                
-                memcpy(mem, binary, binary_len);
-                if (mprotect(mem, binary_len, PROT_READ | PROT_EXEC) == -1) {
-                  perror("mprotect failed");  // 添加错误处理
-                  return 1;
-                }
-                
-                ((void(*)())mem)();
-                return 0;
-              }
-              EOF
-              
-              # 先用pkg打包
-              pkg . --target node18-linux-arm64 --output temp_binary
-              
-              # 转换为C数组
-              echo "#include <stddef.h>" > binary.c
-              echo "unsigned char binary[] = {" >> binary.c
-              xxd -i < temp_binary >> binary.c
-              echo "};" >> binary.c
-              echo "size_t binary_len = sizeof(binary);" >> binary.c
-              
-              # 交叉编译
-              $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
-                -o MagicSub \
-                loader.c binary.c
-              
-              # 验证文件
-              file MagicSub
-          # 提交更改
-          - name: Commit Changes
-            run: |
-              cd $GITHUB_WORKSPACE
-              git config --global user.email "github-actions[bot]@users.noreply.github.com"
-              git config --global user.name "github-actions[bot]"
-              git add Sub-Store/backend/dist/MagicSub
-              git commit -m "Auto Build" || echo "No changes to commit"
-              git push origin main || echo "No changes to push"
-
-          - name: Create Release
-            uses: softprops/action-gh-release@v1
-            with:
-              tag_name: v${{ steps.date.outputs.date }}
-              files: Sub-Store/backend/dist/MagicSub
-              generate_release_notes: true
-            env:
-              DATE: $(date +'%Y-%m-%d')
-
-              
-          - name: Upload Artifact
-            uses: actions/upload-artifact@v3 
-            with:
-              name: MagicSub
-              path: Sub-Store/backend/dist/MagicSub
+  build:
+    name: Build MagicSub
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            ~/.pkg-cache
+            ~/.pnpm-store
+            android-ndk-${{ env.NDK_VERSION }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+      
+      - name: Setup build environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install global dependencies
+        run: npm install -g pnpm pkg
+      
+      # 后端构建
+      - name: Build Backend
+        run: |
+          git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git
+          cd Sub-Store/backend
+          
+          # 替换API地址
+          sed -i 's#https://sub-store.vercel.app/#http://127.0.0.1:3000#g' src/restful/miscs.js
+          
+          pnpm install
+          pnpm run build
+          pnpm run bundle
+      
+      # 前端构建
+      - name: Build Frontend
+        run: |
+          git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git
+          cd Sub-Store-Front-End
+          
+          # 替换API地址
+          sed -i 's#https://sub.store#http://127.0.0.1:3000#g' .env.production
+          
+          pnpm install
+          pnpm build
+      
+      # 合并构建产物
+      - name: Merge builds
+        run: |
+          mkdir -p Sub-Store/backend/dist/public
+          cp -r Sub-Store-Front-End/dist/* Sub-Store/backend/dist/public/
+      
+      # 二进制打包
+      - name: Package binary
+        working-directory: Sub-Store/backend/dist
+        run: |
+          # 配置pkg
+          cat > package.json << EOF
+          {
+            "name": "magicsub",
+            "main": "./sub-store.bundle.js",
+            "bin": "./sub-store.bundle.js",
+            "pkg": {
+              "assets": ["public/**/*", "../node_modules/**/*"],
+              "scripts": [
+                "./sub-store.bundle.js",
+                "./sub-store-*.min.js",
+                "./sub-store-parser.loon.min.js"
+              ],
+              "targets": ["node18-linux-arm64"],
+              "outputPath": "dist"
+            }
+          }
+          EOF
+          
+          # 设置内存限制并打包
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          pkg . --target node18-linux-arm64 --output temp_binary --debug
+          
+          # 生成C加载器
+          cat > loader.c << 'EOF'
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/mman.h>
+          #include <string.h>
+          
+          extern unsigned char binary[];
+          extern size_t binary_len;
+          
+          int main() {
+            void *mem = mmap(NULL, binary_len, PROT_WRITE | PROT_READ,
+                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (mem == MAP_FAILED) {
+              perror("mmap failed");
+              return 1;
+            }
+            
+            memcpy(mem, binary, binary_len);
+            if (mprotect(mem, binary_len, PROT_READ | PROT_EXEC) == -1) {
+              perror("mprotect failed");
+              return 1;
+            }
+            
+            ((void(*)())mem)();
+            return 0;
+          }
+          EOF
+          
+          # 生成二进制数组
+          {
+            echo "#include <stddef.h>"
+            echo "unsigned char binary[] = {"
+            xxd -i < temp_binary
+            echo "};"
+            echo "size_t binary_len = sizeof(binary);"
+          } > binary.c
+          
+          # 使用NDK编译
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
+            -o MagicSub loader.c binary.c
+      
+      # 发布
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          files: Sub-Store/backend/dist/MagicSub
+          generate_release_notes: true
+      
+      - name: Upload Artifact  
+        uses: actions/upload-artifact@v3
+        with:
+          name: MagicSub
+          path: Sub-Store/backend/dist/MagicSub
