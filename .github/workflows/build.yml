@@ -1,14 +1,14 @@
 name: Build MagicSub
 # 添加权限配置在最顶部
-permissions:
-  contents: write    # 允许创建releases
-  discussions: write # 允许创建讨论
-  pull-requests: write # 允许创建PR
-  
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'
+    inputs:
+      tag:
+        description: 'Release Tag'
+        required: true
+
+permissions:
+  contents: write
 
 env:
   NODE_VERSION: '18.12.1'
@@ -117,19 +117,16 @@ jobs:
           export PKG_IGNORE_TAG=1
           NODE_OPTIONS="--max-old-space-size=6144" pkg . --target node18-linux-arm64 --output MagicSub --options no-warnings --public-packages "*" --debug
 
-
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-
-        with:
-          tag_name: v${{ github.run_number }}
-          files: Sub-Store/backend/dist/MagicSub
-          generate_release_notes: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: MagicSub
           path: Sub-Store/backend/dist/MagicSub
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          files: Sub-Store/backend/dist/MagicSub
+          generate_release_notes: true
+      
