@@ -16,15 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Create pnpm-lock.yaml
-        run: touch pnpm-lock.yaml
-        
       - uses: actions/checkout@v4
       
       - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-          run_install: false
+          run_install: true
       
       - uses: actions/setup-node@v3
         with:
@@ -37,24 +34,24 @@ jobs:
             ~/.pnpm-store
             ~/.pkg-cache
             **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
+      
+      - name: Configure pnpm
+        run: pnpm config set strict-peer-dependencies false
       
       - name: Setup Environment
         run: pnpm add -g pkg
       
       - name: Clone and Fix Repositories
         run: |
-          # 克隆仓库
           git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git
           git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git
           
-          # 修复 Vue 编译错误
           cd Sub-Store-Front-End
           sed -i 's/watch(list,/watch(() => list,/g' src/views/editor/ActionBlock.vue
       
-      # 构建后端
       - name: Build Backend
         run: |
           cd Sub-Store/backend
@@ -63,17 +60,13 @@ jobs:
           NODE_OPTIONS="--max-old-space-size=4096" pnpm run build
           pnpm run bundle
       
-      # 构建前端
       - name: Build Frontend
         run: |
           cd Sub-Store-Front-End
           sed -i 's#https://sub.store#http://127.0.0.1:3000#g' .env.production
           pnpm install
           NODE_OPTIONS="--max-old-space-size=4096" pnpm build
-
-      # ... 其余步骤保持不变
       
-      # 打包二进制
       - name: Package Binary
         run: |
           mkdir -p Sub-Store/backend/dist/public
@@ -96,7 +89,6 @@ jobs:
           
           NODE_OPTIONS="--max-old-space-size=6144" pkg . --target node18-android-arm64 --output MagicSub
       
-      # 发布
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
