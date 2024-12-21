@@ -3,7 +3,7 @@ name: Build MagicSub
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 0点运行
+    - cron: '0 0 * * *'
 
 env:
   NODE_VERSION: '18.12.1'
@@ -17,11 +17,7 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-      # 初始化空的pnpm-lock.yaml
-      - name: Create pnpm-lock.yaml
-        run: touch pnpm-lock.yaml
       
-      # Node环境配置
       - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -32,30 +28,28 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       
-      # 优化缓存
       - uses: actions/cache@v3
         with:
           path: |
             ~/.pnpm-store
             ~/.pkg-cache
             **/node_modules
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/package.json') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}
           restore-keys: |
-            ${{ runner.os }}-deps-
+            ${{ runner.os }}-pnpm-
       
-      # 安装全局依赖
       - name: Setup Environment
-        shell: bash
-        run: |
-          pnpm setup
-          pnpm add -g pkg
+        run: pnpm add -g pkg
       
-      # 并行克隆仓库
-      - name: Clone Repositories
+      - name: Clone and Fix Repositories
         run: |
-          git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git &
-          git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git &
-          wait
+          # 克隆仓库
+          git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git
+          git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git
+          
+          # 修复 Vue 编译错误
+          cd Sub-Store-Front-End
+          sed -i 's/watch(list,/watch(() => list,/g' src/views/editor/ActionBlock.vue
       
       # 构建后端
       - name: Build Backend
