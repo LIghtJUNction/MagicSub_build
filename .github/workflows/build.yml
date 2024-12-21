@@ -75,7 +75,10 @@ jobs:
                     "../node_modules/**/*"
                   ],
                   "scripts": [
-                    "./sub-store.bundle.js"
+                    "./sub-store.bundle.js",
+                    "./sub-store-0.min.js",
+                    "./sub-store-1.min.js",
+                    "./sub-store-parser.loon.min.js"
                   ],
                   "targets": [
                     "node18-linux-arm64"
@@ -84,10 +87,20 @@ jobs:
                 }
               }' > package.json
 
+
           # 打包成二进制
           - name: Package Binary
             working-directory: Sub-Store/backend/dist  
             run: |
+              # 设置环境变量
+              export NODE_OPTIONS="--max-old-space-size=4096"
+              
+              # 打包并输出调试信息
+              pkg . --target node18-linux-arm64 --output temp_binary --debug || {
+                echo "pkg打包失败"
+                ls -la
+                exit 1
+              }
               # 创建加载器源码
               cat > loader.c << 'EOF'
               #include <stdio.h>
