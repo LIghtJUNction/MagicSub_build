@@ -6,7 +6,7 @@ on:
     - cron: '0 0 * * *'  # 每天 UTC 0点运行
 
 env:
-  NODE_VERSION: '18.12'
+  NODE_VERSION: '18.12.1'
   PNPM_VERSION: '8.x'
 
 jobs:
@@ -17,56 +17,60 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # 优化缓存策略
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            ~/.pnpm-store
-            ~/.pkg-cache
-            **/node_modules
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-
-      # 设置Node环境
+      # Node环境配置
       - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-          
+          run_install: false
+      
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          
-      - name: Install global deps
-        run: pnpm add -g pkg
-        
-      # 并行构建前后端
-      - name: Clone repositories
+      
+      # 优化缓存
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pnpm-store
+            ~/.pkg-cache
+            **/node_modules
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+      
+      # 安装全局依赖
+      - name: Setup Environment
         run: |
-          git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git
-          git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git
-          
-      - name: Build projects
+          pnpm setup
+          pnpm add -g pkg
+      
+      # 并行克隆仓库
+      - name: Clone Repositories
         run: |
-          # 后端构建
+          git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git &
+          git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git &
+          wait
+      
+      # 构建后端
+      - name: Build Backend
+        run: |
           cd Sub-Store/backend
           sed -i 's#https://sub-store.vercel.app/#http://127.0.0.1:3000#g' src/restful/miscs.js
           pnpm install
           NODE_OPTIONS="--max-old-space-size=4096" pnpm run build
-          pnpm run bundle &
-          
-          # 前端构建
-          cd ../../Sub-Store-Front-End
+          pnpm run bundle
+      
+      # 构建前端
+      - name: Build Frontend
+        run: |
+          cd Sub-Store-Front-End
           sed -i 's#https://sub.store#http://127.0.0.1:3000#g' .env.production
           pnpm install
-          NODE_OPTIONS="--max-old-space-size=4096" pnpm build &
-          
-          wait
-          
-      # 合并产物并打包
-      - name: Package
+          NODE_OPTIONS="--max-old-space-size=4096" pnpm build
+      
+      # 打包二进制
+      - name: Package Binary
         run: |
           mkdir -p Sub-Store/backend/dist/public
           cp -r Sub-Store-Front-End/dist/* Sub-Store/backend/dist/public/
@@ -87,15 +91,17 @@ jobs:
           EOF
           
           NODE_OPTIONS="--max-old-space-size=6144" pkg . --target node18-android-arm64 --output MagicSub
-
+      
       # 发布
-      - uses: softprops/action-gh-release@v1
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.run_number }}
           files: Sub-Store/backend/dist/MagicSub
           generate_release_notes: true
-          
-      - uses: actions/upload-artifact@v3
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
         with:
           name: MagicSub
           path: Sub-Store/backend/dist/MagicSub
