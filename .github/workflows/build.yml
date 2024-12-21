@@ -57,13 +57,15 @@ jobs:
         with:
           ndk-version: ${{ env.NDK_VERSION }}
       - name: Setup Build Tools
+        shell: bash  # 指定使用 bash 执行
         run: |
           python3 -V
           pnpm config set strict-peer-dependencies false
           pnpm add -g pkg
           git clone --depth 1 https://github.com/nodejs-mobile/nodejs-mobile.git
           cd nodejs-mobile
-          python3 ./tools/android_build.sh $ANDROID_NDK_HOME ${{ env.API_LEVEL }} arm64-v8a
+          chmod +x ./tools/android_build.sh  # 添加执行权限
+          bash ./tools/android_build.sh $ANDROID_NDK_HOME ${{ env.API_LEVEL }} arm64-v8a
   
   
       - name: Clone Repositories
