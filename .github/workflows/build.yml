@@ -73,6 +73,7 @@ jobs:
           pnpm install
           NODE_OPTIONS="--max-old-space-size=4096" pnpm build
 
+
       - name: Package Binary
         run: |
           mkdir -p Sub-Store/backend/dist/public
@@ -89,13 +90,26 @@ jobs:
               "scripts": ["./sub-store.bundle.js"],
               "targets": ["node18-linux-arm64"],
               "outputPath": ".",
-              "compress": true
+              "compress": true,
+              "options": {
+                "node-linker": "static"
+              },
+              "patches": {
+                "vm2": "./patches/vm2+3.9.19.patch"
+              }
             }
           }
           EOF
           
-          NODE_OPTIONS="--max-old-space-size=6144" pkg . --target node18-linux-arm64 --output MagicSub
-      
+          chmod +x sub-store.bundle.js
+          
+          # 强制静态编译
+          export PKG_CACHE_PATH="$PWD/.pkg-cache"
+          export PKG_IGNORE_TAG=1
+          NODE_OPTIONS="--max-old-space-size=6144" pkg . --target node18-linux-arm64 --output MagicSub --options no-warnings --public-packages "*" --debug
+
+
+          
       - name: Create Release
         uses: softprops/action-gh-release@v1
 
