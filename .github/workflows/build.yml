@@ -65,7 +65,7 @@ jobs:
           git clone --depth 1 https://github.com/nodejs-mobile/nodejs-mobile.git
           cd nodejs-mobile
           chmod +x ./tools/android_build.sh  # 添加执行权限
-          bash ./tools/android_build.sh $ANDROID_NDK_HOME ${{ env.API_LEVEL }} arm64-v8a
+          bash ./tools/android_build.sh $ANDROID_NDK_HOME ${{ env.API_LEVEL }} arm64
   
   
       - name: Clone Repositories
