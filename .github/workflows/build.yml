@@ -16,6 +16,9 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+      # 初始化空的pnpm-lock.yaml
+      - name: Create pnpm-lock.yaml
+        run: touch pnpm-lock.yaml
       
       # Node环境配置
       - uses: pnpm/action-setup@v2
