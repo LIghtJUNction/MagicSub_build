@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Create pnpm-lock.yaml if not exists
+        run: |
+          if [ ! -f pnpm-lock.yaml ]; then
+            echo "lockfileVersion: '6.0'" > pnpm-lock.yaml
+          fi
+      
       - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
