@@ -1,5 +1,10 @@
 name: Build MagicSub
-
+# 添加权限配置在最顶部
+permissions:
+  contents: write    # 允许创建releases
+  discussions: write # 允许创建讨论
+  pull-requests: write # 允许创建PR
+  
 on:
   workflow_dispatch:
   schedule:
