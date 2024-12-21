@@ -72,16 +72,31 @@ jobs:
                   "outputPath": "dist"
                 }
               }' > package.json
-
           # 打包成二进制
           - name: Package Binary 
             working-directory: Sub-Store/backend/dist
             run: |
-              NODE_OPTIONS="--max-old-space-size=4096" pkg . --target node18-linux-arm64 --output MagicSub --debug
+              NODE_OPTIONS="--max-old-space-size=4096" pkg . --target node18-linux-arm64 --output MagicSub --debug || true
+              mkdir -p MyModule/system/bin/
+              cp MagicSub MyModule/system/bin/
 
+          # 提交更改
+          - name: Commit Changes
+            run: |
+              git config --global user.email "github-actions[bot]@users.noreply.github.com"
+              git config --global user.name "github-actions[bot]"
+              git add .
+              git commit -m "Auto Build" || echo "No changes to commit"
+              git push origin main || echo "No changes to push"
 
+          - name: Create Release
+            uses: softprops/action-gh-release@v1
+            if: startsWith(github.ref, 'refs/tags/')
+            with:
+              files: MyModule/system/bin/MagicSub
+              
           - name: Upload Artifact
-            uses: actions/upload-artifact@v3
+            uses: actions/upload-artifact@v3 
             with:
               name: MagicSub
-              path: MyModule/system/bin/MagicSub
+              path: Sub-Store/backend/dist/MagicSub
