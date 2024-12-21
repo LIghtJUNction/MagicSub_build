@@ -17,7 +17,7 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Create pnpm-lock.yaml if not exists
         run: |
           if [ ! -f pnpm-lock.yaml ]; then
@@ -83,6 +83,7 @@ jobs:
           {
             "name": "magicsub",
             "main": "./sub-store.bundle.js",
+            "bin": "./sub-store.bundle.js",
             "pkg": {
               "assets": ["public/**/*"],
               "scripts": ["./sub-store.bundle.js"],

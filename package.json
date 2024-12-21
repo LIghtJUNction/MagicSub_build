@@ -1,8 +1,12 @@
 {
-    "name": "magicsub-build",
-    "version": "1.0.0",
-    "private": true,
-    "scripts": {
-      "build": "echo 'Build script placeholder'"
-    }
+  "name": "magicsub",
+  "main": "./sub-store.bundle.js",
+  "bin": "./sub-store.bundle.js",
+  "pkg": {
+    "assets": ["public/**/*"],
+    "scripts": ["./sub-store.bundle.js"],
+    "targets": ["node18-android-arm64"],
+    "outputPath": ".",
+    "compress": true
   }
+}
