@@ -52,6 +52,10 @@ jobs:
       
       - name: Clone and Fix Repositories
         run: |
+          # 清理已存在的目录
+          rm -rf Sub-Store Sub-Store-Front-End
+          
+          # 重新克隆仓库
           git clone --depth 1 https://github.com/sub-store-org/Sub-Store.git
           git clone --depth 1 https://github.com/sub-store-org/Sub-Store-Front-End.git
           
@@ -109,7 +113,7 @@ jobs:
           NODE_OPTIONS="--max-old-space-size=6144" pkg . --target node18-linux-arm64 --output MagicSub --options no-warnings --public-packages "*" --debug
 
 
-          
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
 
