@@ -118,10 +118,10 @@ jobs:
         uses: softprops/action-gh-release@v1
 
         with:
-          tag_name: v${{ github.run_number }}
+          tag_name: 测试
           files: Sub-Store/backend/dist/MagicSub
           generate_release_notes: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+
       
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
