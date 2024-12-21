@@ -88,13 +88,43 @@ jobs:
           - name: Package Binary
             working-directory: Sub-Store/backend/dist  
             run: |
-              # 交叉编译
-              $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++ \
-                -o MagicSub \
-                $(pkg . --target node18-linux-arm64 --output - | xxd -p)
+              # 创建加载器源码
+              cat > loader.c << 'EOF'
+              #include <stdio.h>
+              #include <stdlib.h>
+              #include <unistd.h>
+              #include <sys/mman.h>
               
-              # 设置权限
-              chmod 755 MagicSub
+              extern unsigned char binary[];
+              extern size_t binary_len;
+              
+              int main() {
+                void *mem = mmap(NULL, binary_len, PROT_WRITE | PROT_READ,
+                               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+                if (mem == MAP_FAILED) return 1;
+                
+                memcpy(mem, binary, binary_len);
+                if (mprotect(mem, binary_len, PROT_READ | PROT_EXEC) == -1) return 1;
+                
+                ((void(*)())mem)();
+                return 0;
+              }
+              EOF
+              
+              # 先用pkg打包
+              pkg . --target node18-linux-arm64 --output temp_binary
+              
+              # 转换为C数组
+              echo "#include <stddef.h>" > binary.c
+              echo "unsigned char binary[] = {" >> binary.c
+              xxd -i < temp_binary >> binary.c
+              echo "};" >> binary.c
+              echo "size_t binary_len = sizeof(binary);" >> binary.c
+              
+              # 交叉编译
+              $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
+                -o MagicSub \
+                loader.c binary.c
               
               # 验证文件
               file MagicSub
