@@ -96,9 +96,11 @@ jobs:
           - name: Create Release
             uses: softprops/action-gh-release@v1
             with:
-              tag_name: v${{ github.run_number }}
+              tag_name: v${{ steps.date.outputs.date }}
               files: Sub-Store/backend/dist/MagicSub
               generate_release_notes: true
+            env:
+              DATE: $(date +'%Y-%m-%d')
 
               
           - name: Upload Artifact
