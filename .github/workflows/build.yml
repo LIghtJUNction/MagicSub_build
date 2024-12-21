@@ -1,1 +1,32 @@
+name: Compile JS with NerdLang for ARM64
 
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download sub-store.min.js
+        run: |
+          curl -L -o sub-store.min.js https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.min.js
+
+      - name: Install NerdLang
+        run: |
+          curl -sSL https://github.com/NerdLang/nerd/releases/download/v1.0.0/nerd-linux-arm64.tar.gz | tar -xz -C /usr/local/bin
+
+      - name: Compile sub-store.min.js to ARM64 binary
+        run: |
+          nerd sub-store.min.js --arch arm64 --output sub-store-arm64
+
+      - name: Upload compiled binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: sub-store-arm64
+          path: sub-store-arm64
