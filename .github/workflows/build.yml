@@ -102,20 +102,25 @@ jobs:
               "compress": true,
               "options": {
                 "node-linker": "static"
-              },
-              "patches": {
-                "vm2": "./patches/vm2+3.9.19.patch"
               }
             }
           }
           EOF
           
-          chmod +x sub-store.bundle.js
+          # 增加环境变量强制静态编译
+          export PKG_CONFIG_PATH=""
+          export LDFLAGS="-static"
+          export CFLAGS="-static"
+          export CXXFLAGS="-static"
           
-          # 强制静态编译
-          export PKG_CACHE_PATH="$PWD/.pkg-cache"
-          export PKG_IGNORE_TAG=1
-          NODE_OPTIONS="--max-old-space-size=6144" pkg . --target node18-linux-arm64 --output MagicSub --options no-warnings --public-packages "*" --debug
+          # 打包命令添加静态链接选项
+          NODE_OPTIONS="--max-old-space-size=6144" pkg . \
+            --target node18-linux-arm64 \
+            --output MagicSub \
+            --options no-warnings \
+            --public-packages "*" \
+            --build
+
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
