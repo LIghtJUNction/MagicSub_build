@@ -5,8 +5,14 @@
   "pkg": {
     "assets": ["public/**/*"],
     "scripts": ["./sub-store.bundle.js"],
-    "targets": ["node18-android-arm64"],
+    "targets": ["node18-linux-arm64"],
     "outputPath": ".",
-    "compress": true
+    "compress": true,
+    "options": {
+      "node-linker": "static"
+    },
+    "patches": {
+      "vm2": "./patches/vm2+3.9.19.patch"
+    }
   }
 }
