@@ -8,6 +8,7 @@ on:
 env:
   NODE_VERSION: '18.12.1'
   PNPM_VERSION: '8.x'
+  SHELL: '/bin/bash'
 
 jobs:
   build:
@@ -44,6 +45,7 @@ jobs:
       
       # 安装全局依赖
       - name: Setup Environment
+        shell: bash
         run: |
           pnpm setup
           pnpm add -g pkg
