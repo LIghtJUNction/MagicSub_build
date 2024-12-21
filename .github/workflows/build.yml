@@ -102,6 +102,8 @@ jobs:
           tag_name: v${{ github.run_number }}
           files: Sub-Store/backend/dist/MagicSub
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
