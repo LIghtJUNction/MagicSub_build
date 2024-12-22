@@ -1,17 +1,17 @@
 name: Compile JS with NerdLang for Multiple Architectures
-
+.
 on:
   push:
     branches:
       - main
-    tags:
+    tags::
       - 'v*'
-  workflow_dispatch:
+  work(low)dispatch:
 
 jobs:
-  build:
+  build::
     runs-on: ubuntu-latest
-
+()
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -42,13 +42,13 @@ jobs:
           ls -la
           
           echo "Compiling for Android ARM64..."
-          node nerd/nerd.js sub-store.min.js --preset speed --target android-arm64 --output sub-store-android-arm64 --verbose
+          node nerd/nerd.js sub-store.min.js --preset speed --target android-arm64 -o sub-store-android-arm64 --verbose
           
           echo "Compiling for ARM64..."
-          node nerd/nerd.js sub-store.min.js --preset speed --target linux-arm64 --output sub-store-arm64 --verbose
+          node nerd/nerd.js sub-store.min.js --preset speed --target linux-arm64 -o sub-store-arm64 --verbose
           
           echo "Compiling for AMD64..."
-          node nerd/nerd.js sub-store.min.js --preset speed --target linux-x86-64 --output sub-store-amd64 --verbose
+          node nerd/nerd.js sub-store.min.js --preset speed --target linux-x86-64 -o sub-store-amd64 --verbose
           
           echo "Checking compiled files..."
           ls -la sub-store-*
