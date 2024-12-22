@@ -167,9 +167,11 @@ jobs:
           # 编译二进制文件
           $CC -o ../sub-store-android ../sub-store-main.c ../sub-store.c \
               -I. \
-              -static -lm -fPIC \
+              -static -lm -ldl -fPIC \
               -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM \
-              quickjs.c libregexp.c libunicode.c cutils.c quickjs-libc.c libbf.c
+              -DCONFIG_CC='"clang"' -DCONFIG_PREFIX='"/usr/local"' \
+              quickjs.c libregexp.c libunicode.c cutils.c quickjs-libc.c libbf.c \
+              -Wl,--whole-archive
           
           # strip 二进制文件
           $TOOLCHAIN/bin/llvm-strip ../sub-store-android
