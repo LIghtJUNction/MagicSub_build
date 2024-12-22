@@ -96,6 +96,10 @@ jobs:
           #include "quickjs.h"
           #include "quickjs-libc.h"
           
+          // 声明从 JavaScript 生成的字节码数据
+          extern const uint32_t qjsc_sub_store_size;
+          extern const uint8_t qjsc_sub_store[];
+          
           int main(int argc, char **argv) {
               JSRuntime *rt;
               JSContext *ctx;
@@ -121,10 +125,7 @@ jobs:
               js_init_module_os(ctx, "os");
               
               // 执行生成的 JavaScript 代码
-              extern const uint8_t qjsc_sub_store[];
-              extern const int qjsc_sub_store_size;
-              
-              JSValue val = JS_Eval(ctx, (char *)qjsc_sub_store, qjsc_sub_store_size, "sub-store.js", JS_EVAL_TYPE_GLOBAL);
+              JSValue val = JS_Eval(ctx, (const char *)qjsc_sub_store, qjsc_sub_store_size, "sub-store.js", JS_EVAL_TYPE_GLOBAL);
               if (JS_IsException(val)) {
                   js_std_dump_error(ctx);
                   return 1;
@@ -156,7 +157,7 @@ jobs:
         run: |
           cd quickjs
           # 使用本地编译的 qjsc 生成 C 代码
-          ./qjsc-host -c -o ../sub-store.c ../sub-store-wrapper.js
+          ./qjsc-host -e -o ../sub-store.c ../sub-store-wrapper.js
           
           # 使用 Android NDK 编译最终的二进制文件
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
