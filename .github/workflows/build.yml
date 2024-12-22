@@ -74,3 +74,30 @@ jobs:
           files: sub-store-linux-arm64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+      - name: Check binary details
+        run: |
+          echo "=== File Type ==="
+          file sub-store-static
+          
+          echo -e "\n=== File Permissions ==="
+          ls -l sub-store-static
+          
+          echo -e "\n=== ELF Headers ==="
+          readelf -h sub-store-static
+          
+          echo -e "\n=== Dynamic Section ==="
+          readelf -d sub-store-static
+          
+          echo -e "\n=== Program Headers ==="
+          readelf -l sub-store-static
+          
+          echo -e "\n=== Interpreter ==="
+          readelf -p .interp sub-store-static
+          
+          echo -e "\n=== Shared Libraries ==="
+          ldd sub-store-static || true
+          
+          echo -e "\n=== File Size ==="
+          du -h sub-store-static
