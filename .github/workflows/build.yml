@@ -8,7 +8,7 @@ on:
     paths:
       - '.github/workflows/build.yml'  # 当此文件更新时触发
     branches:
-      - main            # 在 main 分支上
+      - master            # 在 main 分支上
 
 jobs:
   build:
