@@ -227,6 +227,8 @@ jobs:
           $CC -o ../sub-store-android ../launcher.c \
               quickjs.o libregexp.o libunicode.o cutils.o quickjs-libc.o libbf.o \
               -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' \
+              -Wl,-z,max-page-size=0x1000 \
+              -fPIC -fPIE \
               -lm -ldl -static
           
           # 创建 release 目录并复制文件
