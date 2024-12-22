@@ -91,13 +91,8 @@ jobs:
           # 创建 C 包装代码
           cat > sub-store-main.c << 'EOF'
           #include <stdio.h>
-          
-          // 声明从 QuickJS 生成的函数
-          extern JSContext *JS_NewContext(JSRuntime *rt);
-          extern JSRuntime *JS_NewRuntime(void);
-          extern int eval_buf(JSContext *ctx, const void *buf, int buf_len, const char *filename, int eval_flags);
-          extern void JS_FreeContext(JSContext *ctx);
-          extern void JS_FreeRuntime(JSRuntime *rt);
+          #include <quickjs/quickjs.h>
+          #include <quickjs/quickjs-libc.h>
           
           int main(int argc, char **argv) {
               JSRuntime *rt;
@@ -117,12 +112,37 @@ jobs:
                   return 1;
               }
               
+              // 初始化标准库
+              js_std_init_handlers(rt);
+              js_std_add_helpers(ctx, argc, argv);
+              js_init_module_std(ctx, "std");
+              js_init_module_os(ctx, "os");
+              
               // 执行生成的 JavaScript 代码
               extern const uint8_t qjsc_sub_store[];
               extern const int qjsc_sub_store_size;
-              eval_buf(ctx, qjsc_sub_store, qjsc_sub_store_size, "sub-store.js", 0);
+              
+              JSValue val = JS_Eval(ctx, (char *)qjsc_sub_store, qjsc_sub_store_size, "sub-store.js", JS_EVAL_TYPE_GLOBAL);
+              if (JS_IsException(val)) {
+                  js_std_dump_error(ctx);
+                  return 1;
+              }
+              
+              // 调用 start_sub_store 函数
+              JSValue global = JS_GetGlobalObject(ctx);
+              JSValue start_fn = JS_GetPropertyStr(ctx, global, "start_sub_store");
+              if (!JS_IsException(start_fn)) {
+                  JSValue ret = JS_Call(ctx, start_fn, global, 0, NULL);
+                  if (JS_IsException(ret)) {
+                      js_std_dump_error(ctx);
+                  }
+                  JS_FreeValue(ctx, ret);
+              }
+              JS_FreeValue(ctx, start_fn);
+              JS_FreeValue(ctx, global);
               
               // 清理
+              js_std_free_handlers(rt);
               JS_FreeContext(ctx);
               JS_FreeRuntime(rt);
               
@@ -134,7 +154,7 @@ jobs:
         run: |
           cd quickjs
           # 使用本地编译的 qjsc 生成 C 代码
-          ./qjsc-host -c -b -o ../sub-store.c ../sub-store-wrapper.js
+          ./qjsc-host -c -o ../sub-store.c ../sub-store-wrapper.js
           
           # 使用 Android NDK 编译最终的二进制文件
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
@@ -144,9 +164,11 @@ jobs:
           
           # 编译二进制文件
           $CC -o ../sub-store-android ../sub-store-main.c ../sub-store.c \
-              -I. libquickjs.a \
+              -I. -I./include \
+              libquickjs.a \
               -static -lm -fPIC \
-              -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
+              -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM \
+              quickjs-libc.c cutils.c
           
           # strip 二进制文件
           $TOOLCHAIN/bin/llvm-strip ../sub-store-android
