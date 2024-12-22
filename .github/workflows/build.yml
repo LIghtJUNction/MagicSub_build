@@ -1,6 +1,6 @@
 name: Build Sub-Store Native Android Binary
 
-on:
+on:,
   schedule:
     - cron: '0 0 * * *'  # 每天运行
   workflow_dispatch:      # 手动触发
@@ -166,24 +166,17 @@ jobs:
           export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
           
           # 先编译生成的 JavaScript 代码
-          $CC -c -o ../sub-store.o ../sub-store.c -I.
+          $CC -c -o ../sub-store.o ../sub-store.c -I. -D_GNU_SOURCE
           
           # 编译主程序
-          $CC -c -o ../sub-store-main.o ../sub-store-main.c -I.
+          $CC -c -o ../sub-store-main.o ../sub-store-main.c -I. -D_GNU_SOURCE
           
-          # 编译 QuickJS 源文件
-          $CC -c -o quickjs.o quickjs.c -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
-          $CC -c -o libregexp.o libregexp.c -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
-          $CC -c -o libunicode.o libunicode.c -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
-          $CC -c -o cutils.o cutils.c -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
-          $CC -c -o quickjs-libc.o quickjs-libc.c -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
-          $CC -c -o libbf.o libbf.c -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
-          
-          # 链接所有对象文件
+          # 链接所有对象文件 - 注意顺序调整
           $CC -o ../sub-store-android \
-              ../sub-store.o ../sub-store-main.o \
+              ../sub-store.o \
+              ../sub-store-main.o \
               quickjs.o libregexp.o libunicode.o cutils.o quickjs-libc.o libbf.o \
-              -lm -ldl
+              -lm -ldl -static
           
           # strip 二进制文件
           $TOOLCHAIN/bin/llvm-strip ../sub-store-android
