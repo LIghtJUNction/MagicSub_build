@@ -22,7 +22,10 @@ jobs:
 
       - name: Install NerdLang
         run: |
-          curl -sSL https://github.com/NerdLang/nerd/releases/download/v1.0.0/nerd-linux-arm64.tar.gz | tar -xz -C /usr/local/bin
+          mkdir -p /usr/local/bin
+          wget https://github.com/NerdLang/nerd/releases/latest/download/nerd-linux-x64.tar.gz
+          tar -xzf nerd-linux-x64.tar.gz -C /usr/local/bin
+          chmod +x /usr/local/bin/nerd
 
       - name: Compile sub-store.min.js to ARM64 binary
         run: |
