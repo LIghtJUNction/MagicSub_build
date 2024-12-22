@@ -16,27 +16,48 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nodejs npm wget gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt-get install -y \
+            nodejs \
+            npm \
+            wget \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            python3.10 \
+            python-is-python3 \
+            make \
+            build-essential
+          
+      - name: Setup Node.js build environment
+        run: |
+          # 设置 Python 版本
+          sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+          
+          # 验证 Python 版本
+          python --version
+          
+          # 设置交叉编译环境变量
+          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+          echo "CFLAGS=-fPIE -pie" >> $GITHUB_ENV
+          echo "CXXFLAGS=-fPIE -pie" >> $GITHUB_ENV
+          echo "LDFLAGS=-pie" >> $GITHUB_ENV
+          echo "PKG_CACHE_PATH=$(pwd)/.pkg-cache" >> $GITHUB_ENV
+          echo "NODE_OPTIONS=--max-old-space-size=4096" >> $GITHUB_ENV
           
       - name: Download sub-store bundle
         run: |
           wget https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.bundle.js
           
       - name: Install pkg
-        run: npm install -g pkg
+        run: |
+          npm install -g pkg
           
       - name: Build PIE binary
         run: |
-          # 设置交叉编译环境
-          export CC="aarch64-linux-gnu-gcc"
-          export CXX="aarch64-linux-gnu-g++"
-          export CFLAGS="-fPIE -pie"
-          export CXXFLAGS="-fPIE -pie"
-          export LDFLAGS="-pie"
-          export PKG_CACHE_PATH="$(pwd)/.pkg-cache"
-          export NODE_OPTIONS="--max-old-space-size=4096"
+          # 显示环境变量
+          env
           
-          # 使用 pkg 构建
+          # 构建
           pkg sub-store.bundle.js \
             --targets node16-linux-arm64 \
             --output sub-store-static \
@@ -46,36 +67,10 @@ jobs:
             
       - name: Patch binary
         run: |
-          # 安装 patchelf
           sudo apt-get install -y patchelf
-          
-          # 修改二进制文件
           patchelf --set-interpreter /apex/com.android.runtime/bin/linker64 sub-store-static
           patchelf --set-rpath /apex/com.android.runtime/lib64 sub-store-static
           
-      - name: Check binary
-        run: |
-          file sub-store-static
-          
-      - name: Compress binary
-        run: |
-          tar -czf sub-store-linux-arm64.tar.gz sub-store-static
-          
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: sub-store-linux-arm64
-          path: sub-store-linux-arm64.tar.gz
-          
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: sub-store-linux-arm64.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
       - name: Check binary details
         run: |
           echo "=== File Type ==="
@@ -85,19 +80,19 @@ jobs:
           ls -l sub-store-static
           
           echo -e "\n=== ELF Headers ==="
-          readelf -h sub-store-static
+          readelf -h sub-store-static || true
           
           echo -e "\n=== Dynamic Section ==="
-          readelf -d sub-store-static
+          readelf -d sub-store-static || true
           
           echo -e "\n=== Program Headers ==="
-          readelf -l sub-store-static
+          readelf -l sub-store-static || true
           
           echo -e "\n=== Interpreter ==="
-          readelf -p .interp sub-store-static
+          readelf -p .interp sub-store-static || true
           
           echo -e "\n=== Shared Libraries ==="
           ldd sub-store-static || true
           
           echo -e "\n=== File Size ==="
-          du -h sub-store-static
+          du -h sub-store-static || true
