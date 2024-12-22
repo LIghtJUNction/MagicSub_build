@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          apk add --no-cache nodejs npm wget musl-dev tar patchelf
+          apk add --no-cache nodejs npm wget musl-dev tar patchelf gcc
           
       - name: Download sub-store bundle
         run: |
@@ -26,10 +26,13 @@ jobs:
       - name: Install pkg
         run: npm install -g pkg
           
-      - name: Build static binary
+      - name: Build PIE binary
         run: |
           export PKG_CACHE_PATH="$(pwd)/.pkg-cache"
           export NODE_OPTIONS="--max-old-space-size=4096"
+          # 添加 PIE 支持
+          export CFLAGS="-fPIE"
+          export LDFLAGS="-pie"
           pkg sub-store.bundle.js --targets node16-linux-arm64 \
             --output sub-store-static \
             --options experimental-enable-musl=true \
@@ -37,13 +40,17 @@ jobs:
             
       - name: Patch binary
         run: |
-          # 修改动态链接器路径为 Android 路径
           patchelf --set-interpreter /apex/com.android.runtime/bin/linker64 sub-store-static
           patchelf --set-rpath /apex/com.android.runtime/lib64 sub-store-static
+          # 确保是 PIE
+          patchelf --force-rpath --set-rpath /apex/com.android.runtime/lib64 sub-store-static
+          
+      - name: Verify PIE
+        run: |
+          readelf -h sub-store-static | grep "Type.*DYN"
           
       - name: Compress binary
         run: |
-          ls -l sub-store-static
           tar -czf sub-store-linux-arm64.tar.gz sub-store-static
           
       - name: Upload artifact
