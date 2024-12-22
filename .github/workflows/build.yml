@@ -156,22 +156,21 @@ jobs:
       - name: Create Binary
         run: |
           cd quickjs
-          # 使用本地编译的 qjsc 生成 C 代码，使用模块模式
-          ./qjsc-host -m -c -o ../sub-store.c ../sub-store-wrapper.js
+          # 使用本地编译的 qjsc 生成 C 代码，关键是添加 -e 参数
+          ./qjsc-host -e -c -o ../sub-store.c ../sub-store-wrapper.js
           
-          # 使用 Android NDK 编译最终的二进制文件
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
           export TARGET=aarch64-linux-android
           export API=21
           export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
           
-          # 先编译生成的 JavaScript 代码
+          # 编译生成的代码
           $CC -c -o ../sub-store.o ../sub-store.c -I. -D_GNU_SOURCE
           
           # 编译主程序
           $CC -c -o ../sub-store-main.o ../sub-store-main.c -I. -D_GNU_SOURCE
           
-          # 链接所有对象文件 - 注意顺序调整
+          # 链接
           $CC -o ../sub-store-android \
               ../sub-store.o \
               ../sub-store-main.o \
