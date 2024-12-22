@@ -44,9 +44,22 @@ jobs:
           # 修改 Makefile
           sed -i 's/-lm/-lm -static/g' Makefile
           
-          # 编译
+          # 先构建本地版本的 qjsc 编译器
           make clean
-          make PREFIX=/usr
+          unset CC AR AS CXX LD RANLIB STRIP
+          make qjsc
+          mv qjsc qjsc-host
+          
+          # 再构建 Android 版本的运行时库
+          make clean
+          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export AS=$CC
+          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          make PREFIX=/usr libquickjs.a
           
       - name: Download and Process Sub-Store
         run: |
@@ -71,25 +84,22 @@ jobs:
           
       - name: Create Binary
         run: |
-          # 重新设置环境变量
+          cd quickjs
+          # 使用本地编译的 qjsc 生成 C 代码
+          ./qjsc-host -c -o ../sub-store.c ../sub-store-wrapper.js
+          
+          # 使用 Android NDK 编译最终的二进制文件
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
           export TARGET=aarch64-linux-android
           export API=21
-          export AR=$TOOLCHAIN/bin/llvm-ar
           export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export AS=$CC
-          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
-          export LD=$TOOLCHAIN/bin/ld
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
           
-          cd quickjs
-          # 使用交叉编译的 qjsc
-          make qjsc
-          ./qjsc -o ../sub-store-android ../sub-store-wrapper.js
+          $CC -o ../sub-store-android ../sub-store.c \
+              -I. libquickjs.a \
+              -static -lm
           
           # strip 二进制文件
-          $STRIP ../sub-store-android || true
+          $TOOLCHAIN/bin/llvm-strip ../sub-store-android
           
       - name: Create Service Script
         run: |
