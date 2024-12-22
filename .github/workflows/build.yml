@@ -29,14 +29,22 @@ jobs:
         run: |
           git clone https://github.com/NerdLang/nerd.git
           cd nerd
-          npm install
-          npm link
+          echo "Installing dependencies..."
+          npm install --verbose
+          echo "Installing gcc..."
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc g++
           cd ..
 
       - name: Compile sub-store.min.js to ARM64 binary
         run: |
-          nerd sub-store.min.js --preset speed --arch arm64 --target android --output sub-store-android-arm64
-          nerd sub-store.min.js --preset speed --arch arm64 --output sub-store-arm64
+          echo "Current directory: $(pwd)"
+          ls -la
+          echo "Compiling for Android ARM64..."
+          node nerd/nerd.js sub-store.min.js --preset speed --arch arm64 --target android --output sub-store-android-arm64 --verbose
+          
+          echo "Compiling for ARM64..."
+          node nerd/nerd.js sub-store.min.js --preset speed --arch arm64 --output sub-store-arm64 --verbose
 
       - name: Upload ARM64 binaries
         uses: actions/upload-artifact@v3
