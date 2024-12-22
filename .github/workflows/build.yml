@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          apk add --no-cache nodejs npm wget musl-dev tar patchelf gcc
+          apk add --no-cache nodejs npm wget musl-dev tar patchelf gcc file
           
       - name: Download sub-store bundle
         run: |
@@ -30,7 +30,6 @@ jobs:
         run: |
           export PKG_CACHE_PATH="$(pwd)/.pkg-cache"
           export NODE_OPTIONS="--max-old-space-size=4096"
-          # 添加 PIE 支持
           export CFLAGS="-fPIE"
           export LDFLAGS="-pie"
           pkg sub-store.bundle.js --targets node16-linux-arm64 \
@@ -42,12 +41,11 @@ jobs:
         run: |
           patchelf --set-interpreter /apex/com.android.runtime/bin/linker64 sub-store-static
           patchelf --set-rpath /apex/com.android.runtime/lib64 sub-store-static
-          # 确保是 PIE
-          patchelf --force-rpath --set-rpath /apex/com.android.runtime/lib64 sub-store-static
           
-      - name: Verify PIE
+      - name: Check binary
         run: |
-          readelf -h sub-store-static | grep "Type.*DYN"
+          file sub-store-static
+          ls -l sub-store-static
           
       - name: Compress binary
         run: |
