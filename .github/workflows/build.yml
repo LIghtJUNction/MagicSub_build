@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - master
-  release:
-    types: [published]
   schedule:
     - cron: '0 0 * * *'
 
@@ -19,7 +17,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          apk add --no-cache nodejs npm wget musl-dev
+          apk add --no-cache nodejs npm wget musl-dev tar
           
       - name: Download sub-store bundle
         run: |
@@ -30,7 +28,6 @@ jobs:
           
       - name: Build static binary
         run: |
-          # 强制静态链接
           export PKG_CACHE_PATH="$(pwd)/.pkg-cache"
           export NODE_OPTIONS="--max-old-space-size=4096"
           pkg sub-store.bundle.js --targets node16-linux-arm64 \
@@ -40,7 +37,9 @@ jobs:
           
       - name: Compress binary
         run: |
-          tar -czf sub-store-linux-arm64.tar.gz sub-store-linux-arm64
+          # 确保文件存在
+          ls -l sub-store-static
+          tar -czf sub-store-linux-arm64.tar.gz sub-store-static
           
       - name: Upload artifact
         uses: actions/upload-artifact@v3
