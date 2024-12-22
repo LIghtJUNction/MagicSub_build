@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
       - master
   release:
     types: [published]
@@ -14,24 +13,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: alpine:latest
     
     steps:
+      - name: Install dependencies
+        run: |
+          apk add --no-cache nodejs npm wget musl-dev
+          
       - name: Download sub-store bundle
         run: |
           wget https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.bundle.js
           
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18.12'
-          
       - name: Install pkg
         run: npm install -g pkg
           
-      - name: Build static ARM64 binary
+      - name: Build static binary
         run: |
-          pkg sub-store.bundle.js --targets node16-linux-arm64 --output sub-store-linux-arm64 --options static-linking=true
-          chmod +x sub-store-linux-arm64
+          # 强制静态链接
+          export PKG_CACHE_PATH="$(pwd)/.pkg-cache"
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          pkg sub-store.bundle.js --targets node16-linux-arm64 \
+            --output sub-store-static \
+            --options experimental-enable-musl=true \
+            --no-bytecode --public-packages "*" --public
           
       - name: Compress binary
         run: |
