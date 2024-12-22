@@ -71,9 +71,25 @@ jobs:
           
       - name: Create Binary
         run: |
+          # 重新设置环境变量
+          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          export TARGET=aarch64-linux-android
+          export API=21
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
+          export AS=$CC
+          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          
           cd quickjs
+          # 使用交叉编译的 qjsc
+          make qjsc
           ./qjsc -o ../sub-store-android ../sub-store-wrapper.js
-          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-strip ../sub-store-android
+          
+          # strip 二进制文件
+          $STRIP ../sub-store-android || true
           
       - name: Create Service Script
         run: |
