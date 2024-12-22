@@ -1,17 +1,17 @@
 name: Compile JS with NerdLang for Multiple Architectures
-.
+
 on:
   push:
     branches:
       - main
-    tags::
+    tags:
       - 'v*'
-  work(low)dispatch:
+  workflow_dispatch:
 
 jobs:
-  build::
+  build:
     runs-on: ubuntu-latest
-()
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
