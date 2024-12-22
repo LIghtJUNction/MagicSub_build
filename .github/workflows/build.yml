@@ -1,15 +1,14 @@
-name: Build Sub-Store Native Android Binary
-
+name: Build Sub-Store Go Binary
 
 on:
   schedule:
     - cron: '0 0 * * *'  # 每天运行
-  workflow_dispatch:    # 手动触发
+  workflow_dispatch:      # 手动触发
   push:
     paths:
-      - '.github/workflows/build.yml'  # 当此文件更新时触发
+      - '.github/workflows/build.yml'
     branches:
-      - master            # 在 main 分支上
+      - master
 
 jobs:
   build:
@@ -18,281 +17,87 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Setup Android ND,
-        uses: nttld/setup-ndk@v1
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          ndk-version: r25c
+          go-version: '1.21'
           
-      - name: Install dependencies
+      - name: Download Sub-Store
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential ninja-build
-          git clone https://github.com/bellard/quickjs.git
+          curl -L -o sub-store.min.js https://github.com/sub-store-org/Sub-Store/releases/download/latest/sub-store.min.js
           
-      - name: Build QuickJS for Android
+      - name: Create Go Project
         run: |
-          cd quickjs
-          # 先构建本地版本的 qjsc 编译器
-          make clean
-          make qjsc
-          mv qjsc qjsc-host
+          mkdir -p sub-store-go
+          cd sub-store-go
+          go mod init sub-store
           
-          # 再构建 Android 版本的运行时库
-          make clean
-          # 配置交叉编译
-          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-          export TARGET=aarch64-linux-android
-          export API=21
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export AS=$CC
-          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
-          export LD=$TOOLCHAIN/bin/ld
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          # 安装必要的依赖
+          go get github.com/gin-gonic/gin
+          go get github.com/dop251/goja
+          go get github.com/sirupsen/logrus
           
-          # 直接编译所需的对象文件，添加 -fPIC 和对齐标志
-          COMMON_FLAGS="-fPIC -fno-plt -fno-stack-protector -D_GNU_SOURCE -DCONFIG_VERSION='\"2024-02-14\"' -DCONFIG_BIGNUM"
-          
-          $CC -c -o quickjs.o quickjs.c -I. $COMMON_FLAGS
-          $CC -c -o libregexp.o libregexp.c -I. $COMMON_FLAGS
-          $CC -c -o libunicode.o libunicode.c -I. $COMMON_FLAGS
-          $CC -c -o cutils.o cutils.c -I. $COMMON_FLAGS
-          $CC -c -o quickjs-libc.o quickjs-libc.c -I. $COMMON_FLAGS
-          $CC -c -o libbf.o libbf.c -I. $COMMON_FLAGS
-          
-          # 创建静态库
-          $AR rcs libquickjs.a quickjs.o libregexp.o libunicode.o cutils.o quickjs-libc.o libbf.o
-          
-      - name: Download and Process Sub-Store
-        run: |
-          # 下载最新的 sub-store.min.js
-          curl -L -o sub-store.min.js https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.min.js
-          
-          # 创建启动包装脚本
-          cat > sub-store-wrapper.js << 'EOF'
-          import * as std from 'std';
-          import * as os from 'os';
-          
-          globalThis.start_sub_store = function() {
-              // 读取并执行原始的 sub-store 代码
-              const subStoreCode = std.loadFile('sub-store.min.js');
-              eval(subStoreCode);
-              
-              // 保持进程运行
-              while(true) {
-                  os.sleep(1000);
+          # 创建主程序
+          cat > main.go << 'EOF'
+          package main
+
+          import (
+              "io/ioutil"
+              "github.com/dop251/goja"
+              "github.com/gin-gonic/gin"
+              "github.com/sirupsen/logrus"
+          )
+
+          func main() {
+              // 读取 JS 文件
+              jsCode, err := ioutil.ReadFile("sub-store.js")
+              if err != nil {
+                  logrus.Fatalf("Failed to read JS file: %v", err)
               }
-              return 0;
+
+              // 创建 JS 运行时
+              vm := goja.New()
+
+              // 注入必要的全局对象和函数
+              // TODO: 实现所需的全局对象和 API
+
+              // 执行 JS 代码
+              _, err = vm.RunString(string(jsCode))
+              if err != nil {
+                  logrus.Fatalf("Failed to execute JS: %v", err)
+              }
+
+              // 设置 HTTP 服务器
+              r := gin.Default()
+              
+              // TODO: 实现必要的路由和处理函数
+              
+              // 启动服务器
+              r.Run(":6080")
           }
           EOF
           
-          # 创建 C 包装代码
-          cat > sub-store-main.c << 'EOF'
-          #include <stdio.h>
-          #include "quickjs.h"
-          #include "quickjs-libc.h"
-          
-          // 声明从 JavaScript 生成的字节码数据
-          extern const uint32_t qjsc_sub_store_size;
-          extern const uint8_t qjsc_sub_store[];
-          
-          int main(int argc, char **argv) {
-              JSRuntime *rt;
-              JSContext *ctx;
-              
-              // 初始化 QuickJS
-              rt = JS_NewRuntime();
-              if (!rt) {
-                  fprintf(stderr, "Failed to create JS runtime\n");
-                  return 1;
-              }
-              
-              ctx = JS_NewContext(rt);
-              if (!ctx) {
-                  JS_FreeRuntime(rt);
-                  fprintf(stderr, "Failed to create JS context\n");
-                  return 1;
-              }
-              
-              // 初始化标准库
-              js_std_init_handlers(rt);
-              js_std_add_helpers(ctx, argc, argv);
-              js_init_module_std(ctx, "std");
-              js_init_module_os(ctx, "os");
-              
-              // 执行生成的 JavaScript 代码
-              JSValue val = JS_Eval(ctx, (const char *)qjsc_sub_store, qjsc_sub_store_size, "sub-store.js", JS_EVAL_TYPE_GLOBAL);
-              if (JS_IsException(val)) {
-                  js_std_dump_error(ctx);
-                  return 1;
-              }
-              
-              // 调用 start_sub_store 函数
-              JSValue global = JS_GetGlobalObject(ctx);
-              JSValue start_fn = JS_GetPropertyStr(ctx, global, "start_sub_store");
-              if (!JS_IsException(start_fn)) {
-                  JSValue ret = JS_Call(ctx, start_fn, global, 0, NULL);
-                  if (JS_IsException(ret)) {
-                      js_std_dump_error(ctx);
-                  }
-                  JS_FreeValue(ctx, ret);
-              }
-              JS_FreeValue(ctx, start_fn);
-              JS_FreeValue(ctx, global);
-              
-              // 清理
-              js_std_free_handlers(rt);
-              JS_FreeContext(ctx);
-              JS_FreeRuntime(rt);
-              
-              return 0;
-          }
-          EOF
-          
-      - name: Create Binary
+      - name: Build for Multiple Platforms
         run: |
-          cd quickjs
+          cd sub-store-go
           
-          # 编译一个简单的 C 程序作为启动器
-          cat > ../launcher.c << 'EOF'
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <string.h>
-          #include "quickjs.h"
-          #include "quickjs-libc.h"
+          # 编译 Android arm64
+          GOOS=android GOARCH=arm64 go build -o ../release/sub-store-android-arm64
           
-          int main(int argc, char **argv) {
-              JSRuntime *rt;
-              JSContext *ctx;
-              
-              rt = JS_NewRuntime();
-              ctx = JS_NewContext(rt);
-              
-              // 初始化标准库
-              js_std_init_handlers(rt);
-              js_std_add_helpers(ctx, argc, argv);
-              js_init_module_std(ctx, "std");
-              js_init_module_os(ctx, "os");
-              
-              // 读取并执行 sub-store.js
-              FILE *f = fopen("/data/local/tmp/sub-store.js", "rb");
-              if (!f) {
-                  fprintf(stderr, "Cannot open sub-store.js\n");
-                  return 1;
-              }
-              
-              fseek(f, 0, SEEK_END);
-              size_t size = ftell(f);
-              fseek(f, 0, SEEK_SET);
-              
-              char *buf = malloc(size + 1);
-              fread(buf, 1, size, f);
-              buf[size] = 0;
-              fclose(f);
-              
-              JSValue val = JS_Eval(ctx, buf, size, "sub-store.js", JS_EVAL_TYPE_MODULE);
-              if (JS_IsException(val)) {
-                  js_std_dump_error(ctx);
-                  return 1;
-              }
-              
-              // 保持进程运行
-              while(1) {
-                  JSContext *ctx1;
-                  int err = JS_ExecutePendingJob(rt, &ctx1);
-                  if (err <= 0) {
-                      if (err < 0)
-                          js_std_dump_error(ctx1);
-                      break;
-                  }
-              }
-              
-              free(buf);
-              JS_FreeContext(ctx);
-              JS_FreeRuntime(rt);
-              return 0;
-          }
-          EOF
+          # 编译 Linux arm64
+          GOOS=linux GOARCH=arm64 go build -o ../release/sub-store-linux-arm64
           
-          # 编译启动器
-          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-          export TARGET=aarch64-linux-android
-          export API=21
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
+          # 编译 Linux amd64
+          GOOS=linux GOARCH=amd64 go build -o ../release/sub-store-linux-amd64
           
-          $CC -o ../sub-store-android ../launcher.c \
-              quickjs.o libregexp.o libunicode.o cutils.o quickjs-libc.o libbf.o \
-              -I. -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' \
-              -fPIC -fno-plt -fno-stack-protector \
-              -Wl,-z,max-page-size=0x1000 \
-              -Wl,--hash-style=both \
-              -Wl,-z,relro,-z,now \
-              -lm -ldl -static
-          
-          # 创建 release 目录并复制文件
-          mkdir -p ../release
-          cp ../sub-store.min.js ../release/sub-store.js
-          
-      - name: Create Service Script
-        run: |
-          cat > sub-store.service << 'EOF'
-          [Unit]
-          Description=Sub-Store Service
-          After=network.target
-          
-          [Service]
-          Type=simple
-          ExecStart=/data/local/tmp/sub-store-android
-          Restart=always
-          
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          
-      - name: Package Release
+      - name: Create Release Package
         run: |
           mkdir -p release
-          cp sub-store-android release/
-          cp sub-store.service release/
-          
-          # 创建安装脚本
-          cat > release/install.sh << 'EOF'
-          #!/system/bin/sh
-          
-          # 复制二进制文件
-          cp sub-store-android /data/local/tmp/
-          chmod 755 /data/local/tmp/sub-store-android
-          
-          # 如果系统支持 systemd，安装服务
-          if [ -d "/system/etc/systemd/system" ]; then
-            cp sub-store.service /system/etc/systemd/system/
-            systemctl enable sub-store
-            systemctl start sub-store
-          else
-            # 否则使用 init.d
-            cp sub-store-android /system/bin/
-            cat > /system/etc/init.d/sub-store << 'END'
-            #!/system/bin/sh
-            /data/local/tmp/sub-store-android &
-            END
-            chmod 755 /system/etc/init.d/sub-store
-          fi
-          EOF
-          
-          chmod +x release/install.sh
-          cd release && zip -r ../sub-store-android.zip ./*
-          
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: sub-store-android.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cp sub-store.min.js release/sub-store.js
+          cd release && zip -r ../sub-store-go.zip ./*
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sub-store-android
-          path: sub-store-android.zip
+          name: sub-store-go
+          path: sub-store-go.zip
