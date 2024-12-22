@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Setup Android NDK
+      - name: Setup Android ND,
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25c
@@ -30,16 +30,22 @@ jobs:
         run: |
           cd quickjs
           # 配置交叉编译
-          export CROSS_PREFIX="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-"
-          export CC="${CROSS_PREFIX}clang"
-          export AR="${CROSS_PREFIX}ar"
-          export STRIP="${CROSS_PREFIX}strip"
+          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          export TARGET=aarch64-linux-android
+          export API=21
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
+          export AS=$CC
+          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
           
           # 修改 Makefile
           sed -i 's/-lm/-lm -static/g' Makefile
-          sed -i 's/CROSS_PREFIX=.*/CROSS_PREFIX=aarch64-linux-android21-/g' Makefile
           
           # 编译
+          make clean
           make PREFIX=/usr
           
       - name: Download and Process Sub-Store
