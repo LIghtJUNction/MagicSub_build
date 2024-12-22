@@ -36,10 +36,11 @@ jobs:
           sudo apt-get install -y build-essential gcc g++
           cd ..
 
-      - name: Compile sub-store.min.js to ARM64 binary
+      - name: Compile sub-store.min.js to binaries
         run: |
           echo "Current directory: $(pwd)"
           ls -la
+          
           echo "Compiling for Android ARM64..."
           node nerd/nerd.js sub-store.min.js --preset speed --arch arm64 --target android --output sub-store-android-arm64 --verbose
           
@@ -48,15 +49,24 @@ jobs:
           
           echo "Compiling for AMD64..."
           node nerd/nerd.js sub-store.min.js --preset speed --arch amd64 --output sub-store-amd64 --verbose
+          
+          echo "Checking compiled files..."
+          ls -la sub-store-*
+          
+          echo "Checking nerd directory..."
+          ls -la nerd/
+          
+          echo "Checking current directory structure..."
+          find . -type f -name "sub-store*"
 
       - name: Upload binaries
         uses: actions/upload-artifact@v3
         with:
           name: sub-store-binaries
           path: |
-            sub-store-android-arm64
-            sub-store-arm64
-            sub-store-amd64
+            ./sub-store-android-arm64
+            ./sub-store-arm64
+            ./sub-store-amd64
           retention-days: 1
 
       - name: Verify binaries
