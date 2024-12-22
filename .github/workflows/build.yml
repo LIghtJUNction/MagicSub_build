@@ -48,11 +48,16 @@ jobs:
           export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
           export STRIP=$TOOLCHAIN/bin/llvm-strip
           
-          # 修改 Makefile 以支持静态链接
-          sed -i 's/-lm/-lm -static/g' Makefile
+          # 直接编译所需的对象文件
+          $CC -c -o quickjs.o quickjs.c -I. -fPIC
+          $CC -c -o libregexp.o libregexp.c -I. -fPIC
+          $CC -c -o libunicode.o libunicode.c -I. -fPIC
+          $CC -c -o cutils.o cutils.c -I. -fPIC
+          $CC -c -o quickjs-libc.o quickjs-libc.c -I. -fPIC
+          $CC -c -o libbf.o libbf.c -I. -fPIC
           
-          # 编译 Android 版本的库
-          make libquickjs.a
+          # 创建静态库
+          $AR rcs libquickjs.a quickjs.o libregexp.o libunicode.o cutils.o quickjs-libc.o libbf.o
           
       - name: Download and Process Sub-Store
         run: |
@@ -90,8 +95,8 @@ jobs:
           # 编译二进制文件
           $CC -o ../sub-store-android ../sub-store.c \
               -I. libquickjs.a \
-              -static -lm \
-              -fPIC
+              -static -lm -fPIC \
+              -D_GNU_SOURCE -DCONFIG_VERSION=\"2024-02-14\" -DCONFIG_BIGNUM
           
           # strip 二进制文件
           $TOOLCHAIN/bin/llvm-strip ../sub-store-android
