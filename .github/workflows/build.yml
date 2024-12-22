@@ -11,13 +11,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: alpine:latest
     
     steps:
       - name: Install dependencies
         run: |
-          apk add --no-cache nodejs npm wget musl-dev tar patchelf gcc file
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm wget gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
           
       - name: Download sub-store bundle
         run: |
@@ -28,24 +27,35 @@ jobs:
           
       - name: Build PIE binary
         run: |
+          # 设置交叉编译环境
+          export CC="aarch64-linux-gnu-gcc"
+          export CXX="aarch64-linux-gnu-g++"
+          export CFLAGS="-fPIE -pie"
+          export CXXFLAGS="-fPIE -pie"
+          export LDFLAGS="-pie"
           export PKG_CACHE_PATH="$(pwd)/.pkg-cache"
           export NODE_OPTIONS="--max-old-space-size=4096"
-          export CFLAGS="-fPIE"
-          export LDFLAGS="-pie"
-          pkg sub-store.bundle.js --targets node16-linux-arm64 \
+          
+          # 使用 pkg 构建
+          pkg sub-store.bundle.js \
+            --targets node16-linux-arm64 \
             --output sub-store-static \
             --options experimental-enable-musl=true \
-            --no-bytecode --public-packages "*" --public
+            --no-bytecode --public-packages "*" --public \
+            --build
             
       - name: Patch binary
         run: |
+          # 安装 patchelf
+          sudo apt-get install -y patchelf
+          
+          # 修改二进制文件
           patchelf --set-interpreter /apex/com.android.runtime/bin/linker64 sub-store-static
           patchelf --set-rpath /apex/com.android.runtime/lib64 sub-store-static
           
       - name: Check binary
         run: |
           file sub-store-static
-          ls -l sub-store-static
           
       - name: Compress binary
         run: |
