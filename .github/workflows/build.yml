@@ -91,8 +91,8 @@ jobs:
           # 创建 C 包装代码
           cat > sub-store-main.c << 'EOF'
           #include <stdio.h>
-          #include <quickjs/quickjs.h>
-          #include <quickjs/quickjs-libc.h>
+          #include "quickjs.h"
+          #include "quickjs-libc.h"
           
           int main(int argc, char **argv) {
               JSRuntime *rt;
@@ -164,7 +164,7 @@ jobs:
           
           # 编译二进制文件
           $CC -o ../sub-store-android ../sub-store-main.c ../sub-store.c \
-              -I. -I./include \
+              -I. \
               libquickjs.a \
               -static -lm -fPIC \
               -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM \
