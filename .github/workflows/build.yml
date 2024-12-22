@@ -29,6 +29,13 @@ jobs:
       - name: Build QuickJS for Android
         run: |
           cd quickjs
+          # 先构建本地版本的 qjsc 编译器
+          make clean
+          make qjsc
+          mv qjsc qjsc-host
+          
+          # 再构建 Android 版本的运行时库
+          make clean
           # 配置交叉编译
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
           export TARGET=aarch64-linux-android
@@ -41,25 +48,11 @@ jobs:
           export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
           export STRIP=$TOOLCHAIN/bin/llvm-strip
           
-          # 修改 Makefile
+          # 修改 Makefile 以支持静态链接
           sed -i 's/-lm/-lm -static/g' Makefile
           
-          # 先构建本地版本的 qjsc 编译器
-          make clean
-          unset CC AR AS CXX LD RANLIB STRIP
-          make qjsc
-          mv qjsc qjsc-host
-          
-          # 再构建 Android 版本的运行时库
-          make clean
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export AS=$CC
-          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
-          export LD=$TOOLCHAIN/bin/ld
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          make PREFIX=/usr libquickjs.a
+          # 编译 Android 版本的库
+          make libquickjs.a
           
       - name: Download and Process Sub-Store
         run: |
@@ -94,9 +87,11 @@ jobs:
           export API=21
           export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
           
+          # 编译二进制文件
           $CC -o ../sub-store-android ../sub-store.c \
               -I. libquickjs.a \
-              -static -lm
+              -static -lm \
+              -fPIC
           
           # strip 二进制文件
           $TOOLCHAIN/bin/llvm-strip ../sub-store-android
