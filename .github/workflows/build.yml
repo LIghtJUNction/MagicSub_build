@@ -1,103 +1,52 @@
-name: Build Sub-Store Go Binary
+name: Build Linux ARM64 Binary
 
 on:
-  schedule:
-    - cron: '0 0 * * *'  # 每天运行
-  workflow_dispatch:      # 手动触发
+  workflow_dispatch:
   push:
-    paths:
-      - '.github/workflows/build.yml'
     branches:
+      - main
       - master
+  release:
+    types: [published]
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Download sub-store bundle
+        run: |
+          wget https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.bundle.js
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          go-version: '1.21'
+          node-version: '18.12'
           
-      - name: Download Sub-Store
+      - name: Install pkg
+        run: npm install -g pkg
+          
+      - name: Build static ARM64 binary
         run: |
-          curl -L -o sub-store.min.js https://github.com/sub-store-org/Sub-Store/releases/download/latest/sub-store.min.js
+          pkg sub-store.bundle.js --targets node16-linux-arm64 --output sub-store-linux-arm64 --options static-linking=true
+          chmod +x sub-store-linux-arm64
           
-      - name: Create Go Project
+      - name: Compress binary
         run: |
-          mkdir -p sub-store-go
-          cd sub-store-go
-          go mod init sub-store
+          tar -czf sub-store-linux-arm64.tar.gz sub-store-linux-arm64
           
-          # 安装必要的依赖
-          go get github.com/gin-gonic/gin
-          go get github.com/dop251/goja
-          go get github.com/sirupsen/logrus
-          
-          # 创建主程序
-          cat > main.go << 'EOF'
-          package main
-
-          import (
-              "io/ioutil"
-              "github.com/dop251/goja"
-              "github.com/gin-gonic/gin"
-              "github.com/sirupsen/logrus"
-          )
-
-          func main() {
-              // 读取 JS 文件
-              jsCode, err := ioutil.ReadFile("sub-store.js")
-              if err != nil {
-                  logrus.Fatalf("Failed to read JS file: %v", err)
-              }
-
-              // 创建 JS 运行时
-              vm := goja.New()
-
-              // 注入必要的全局对象和函数
-              // TODO: 实现所需的全局对象和 API
-
-              // 执行 JS 代码
-              _, err = vm.RunString(string(jsCode))
-              if err != nil {
-                  logrus.Fatalf("Failed to execute JS: %v", err)
-              }
-
-              // 设置 HTTP 服务器
-              r := gin.Default()
-              
-              // TODO: 实现必要的路由和处理函数
-              
-              // 启动服务器
-              r.Run(":6080")
-          }
-          EOF
-          
-      - name: Build for Multiple Platforms
-        run: |
-          cd sub-store-go
-          
-          # 编译 Android arm64
-          GOOS=android GOARCH=arm64 go build -o ../release/sub-store-android-arm64
-          
-          # 编译 Linux arm64
-          GOOS=linux GOARCH=arm64 go build -o ../release/sub-store-linux-arm64
-          
-          # 编译 Linux amd64
-          GOOS=linux GOARCH=amd64 go build -o ../release/sub-store-linux-amd64
-          
-      - name: Create Release Package
-        run: |
-          mkdir -p release
-          cp sub-store.min.js release/sub-store.js
-          cd release && zip -r ../sub-store-go.zip ./*
-          
-      - name: Upload Artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sub-store-go
-          path: sub-store-go.zip
+          name: sub-store-linux-arm64
+          path: sub-store-linux-arm64.tar.gz
+          
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: sub-store-linux-arm64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
