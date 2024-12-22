@@ -36,19 +36,23 @@ jobs:
           sudo apt-get install -y build-essential gcc g++
           cd ..
 
+      - name: Prepare JavaScript file
+        run: |
+          # 创建一个简单的包装器
+          echo "const run = () => {" > wrapper.js
+          cat sub-store.min.js >> wrapper.js
+          echo "}; run();" >> wrapper.js
+
       - name: Compile sub-store.min.js to binaries
         run: |
-          echo "Current directory: $(pwd)"
-          ls -la
-          
           echo "Compiling for Android ARM64..."
-          node nerd/nerd.js sub-store.min.js --preset speed --target android-arm64 -o sub-store-android-arm64 --verbose
+          node nerd/nerd.js wrapper.js --preset speed --target android-arm64 -o sub-store-android-arm64 --verbose
           
           echo "Compiling for ARM64..."
-          node nerd/nerd.js sub-store.min.js --preset speed --target linux-arm64 -o sub-store-arm64 --verbose
+          node nerd/nerd.js wrapper.js --preset speed --target linux-arm64 -o sub-store-arm64 --verbose
           
           echo "Compiling for AMD64..."
-          node nerd/nerd.js sub-store.min.js --preset speed --target linux-x86-64 -o sub-store-amd64 --verbose
+          node nerd/nerd.js wrapper.js --preset speed --target linux-x86-64 -o sub-store-amd64 --verbose
           
           echo "Checking compiled files..."
           ls -la sub-store-*
