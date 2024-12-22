@@ -72,17 +72,19 @@ jobs:
           
           # 创建启动包装脚本
           cat > sub-store-wrapper.js << 'EOF'
-          // 导入必要的系统模块
           import * as std from 'std';
           import * as os from 'os';
           
-          // 读取并执行原始的 sub-store 代码
-          const subStoreCode = std.loadFile('sub-store.min.js');
-          eval(subStoreCode);
-          
-          // 保持进程运行
-          while(true) {
-            os.sleep(1000);
+          function main() {
+              // 读取并执行原始的 sub-store 代码
+              const subStoreCode = std.loadFile('sub-store.min.js');
+              eval(subStoreCode);
+              
+              // 保持进程运行
+              while(true) {
+                  os.sleep(1000);
+              }
+              return 0;
           }
           EOF
           
@@ -90,7 +92,7 @@ jobs:
         run: |
           cd quickjs
           # 使用本地编译的 qjsc 生成 C 代码
-          ./qjsc-host -c -o ../sub-store.c ../sub-store-wrapper.js
+          ./qjsc-host -c -m -o ../sub-store.c ../sub-store-wrapper.js
           
           # 使用 Android NDK 编译最终的二进制文件
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
@@ -102,7 +104,7 @@ jobs:
           $CC -o ../sub-store-android ../sub-store.c \
               -I. libquickjs.a \
               -static -lm -fPIC \
-              -D_GNU_SOURCE -DCONFIG_VERSION=\"2024-02-14\" -DCONFIG_BIGNUM
+              -D_GNU_SOURCE -DCONFIG_VERSION='"2024-02-14"' -DCONFIG_BIGNUM
           
           # strip 二进制文件
           $TOOLCHAIN/bin/llvm-strip ../sub-store-android
