@@ -20,33 +20,31 @@ jobs:
         run: |
           curl -L -o sub-store.min.js https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.min.js
 
-      - name: Install NerdLang
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install NerdLang from source
         run: |
-          mkdir -p /usr/local/bin
-          wget https://github.com/NerdLang/nerd/releases/latest/download/nerd-linux-x64.tar.gz
-          tar -xzf nerd-linux-x64.tar.gz -C /usr/local/bin
-          chmod +x /usr/local/bin/nerd
+          git clone https://github.com/NerdLang/nerd.git
+          cd nerd
+          npm install
+          npm link
+          cd ..
 
       - name: Compile sub-store.min.js to ARM64 binary
         run: |
-          nerd sub-store.min.js --arch arm64 --output sub-store-arm64
+          nerd sub-store.min.js --preset speed --arch arm64 --target android --output sub-store-android-arm64
+          nerd sub-store.min.js --preset speed --arch arm64 --output sub-store-arm64
 
-      - name: Upload compiled binary
+      - name: Upload ARM64 binaries
         uses: actions/upload-artifact@v3
         with:
-          name: sub-store-arm64
-          path: sub-store-arm64
-          retention-days: 1
-
-      - name: Compile sub-store.min.js to Android ARM64 binary
-        run: |
-          nerd sub-store.min.js --arch arm64 --platform android --output sub-store-android-arm64
-
-      - name: Upload Android ARM64 binary
-        uses: actions/upload-artifact@v3
-        with:
-          name: sub-store-android-arm64
-          path: sub-store-android-arm64
+          name: sub-store-binaries
+          path: |
+            sub-store-android-arm64
+            sub-store-arm64
           retention-days: 1
 
       - name: Compile sub-store.min.js to AMD64 binary
