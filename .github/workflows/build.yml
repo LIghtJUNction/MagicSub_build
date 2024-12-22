@@ -1,4 +1,4 @@
-name: Compile JS with NerdLang for ARM64
+name: Compile JS with NerdLang for Multiple Architectures
 
 on:
   push:
@@ -30,3 +30,43 @@ jobs:
         with:
           name: sub-store-arm64
           path: sub-store-arm64
+          retention-days: 1
+
+      - name: Compile sub-store.min.js to Android ARM64 binary
+        run: |
+          nerd sub-store.min.js --arch arm64 --platform android --output sub-store-android-arm64
+
+      - name: Upload Android ARM64 binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: sub-store-android-arm64
+          path: sub-store-android-arm64
+          retention-days: 1
+
+      - name: Compile sub-store.min.js to AMD64 binary
+        run: |
+          nerd sub-store.min.js --arch amd64 --output sub-store-amd64
+
+      - name: Upload AMD64 binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: sub-store-amd64
+          path: sub-store-amd64
+          retention-days: 1
+
+      - name: Verify binaries
+        run: |
+          file sub-store-arm64
+          file sub-store-android-arm64
+          file sub-store-amd64
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sub-store-arm64
+            sub-store-android-arm64
+            sub-store-amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
