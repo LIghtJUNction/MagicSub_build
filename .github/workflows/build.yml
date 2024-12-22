@@ -1,0 +1,133 @@
+name: Build Sub-Store Native Android Binary
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天运行
+  workflow_dispatch:      # 手动触发
+  push:
+    tags:
+      - 'v*'             # 推送新标签时触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+          
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build
+          git clone https://github.com/bellard/quickjs.git
+          
+      - name: Build QuickJS for Android
+        run: |
+          cd quickjs
+          # 配置交叉编译
+          export CROSS_PREFIX="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-"
+          export CC="${CROSS_PREFIX}clang"
+          export AR="${CROSS_PREFIX}ar"
+          export STRIP="${CROSS_PREFIX}strip"
+          
+          # 修改 Makefile
+          sed -i 's/-lm/-lm -static/g' Makefile
+          sed -i 's/CROSS_PREFIX=.*/CROSS_PREFIX=aarch64-linux-android21-/g' Makefile
+          
+          # 编译
+          make PREFIX=/usr
+          
+      - name: Download and Process Sub-Store
+        run: |
+          # 下载最新的 sub-store.min.js
+          curl -L -o sub-store.min.js https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.min.js
+          
+          # 创建启动包装脚本
+          cat > sub-store-wrapper.js << 'EOF'
+          // 导入必要的系统模块
+          import * as std from 'std';
+          import * as os from 'os';
+          
+          // 读取并执行原始的 sub-store 代码
+          const subStoreCode = std.loadFile('sub-store.min.js');
+          eval(subStoreCode);
+          
+          // 保持进程运行
+          while(true) {
+            os.sleep(1000);
+          }
+          EOF
+          
+      - name: Create Binary
+        run: |
+          cd quickjs
+          ./qjsc -o ../sub-store-android ../sub-store-wrapper.js
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-strip ../sub-store-android
+          
+      - name: Create Service Script
+        run: |
+          cat > sub-store.service << 'EOF'
+          [Unit]
+          Description=Sub-Store Service
+          After=network.target
+          
+          [Service]
+          Type=simple
+          ExecStart=/data/local/tmp/sub-store-android
+          Restart=always
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+      - name: Package Release
+        run: |
+          mkdir -p release
+          cp sub-store-android release/
+          cp sub-store.service release/
+          
+          # 创建安装脚本
+          cat > release/install.sh << 'EOF'
+          #!/system/bin/sh
+          
+          # 复制二进制文件
+          cp sub-store-android /data/local/tmp/
+          chmod 755 /data/local/tmp/sub-store-android
+          
+          # 如果系统支持 systemd，安装服务
+          if [ -d "/system/etc/systemd/system" ]; then
+            cp sub-store.service /system/etc/systemd/system/
+            systemctl enable sub-store
+            systemctl start sub-store
+          else
+            # 否则使用 init.d
+            cp sub-store-android /system/bin/
+            cat > /system/etc/init.d/sub-store << 'END'
+            #!/system/bin/sh
+            /data/local/tmp/sub-store-android &
+            END
+            chmod 755 /system/etc/init.d/sub-store
+          fi
+          EOF
+          
+          chmod +x release/install.sh
+          cd release && zip -r ../sub-store-android.zip ./*
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: sub-store-android.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sub-store-android
+          path: sub-store-android.zip
