@@ -56,6 +56,7 @@ jobs:
         if: steps.check.outputs.new_version == 'true'
         env:
           NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GYP_DEFINES: "android_ndk_path=${{ steps.setup-ndk.outputs.ndk-path }}"
         run: |
           cd node
           
@@ -69,12 +70,17 @@ jobs:
           export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
           export STRIP=$TOOLCHAIN/bin/llvm-strip
           
+          # 显示环境信息
+          echo "NDK_PATH: $NDK_PATH"
+          echo "GYP_DEFINES: $GYP_DEFINES"
+          
           # 配置 Node.js
           ./configure \
             --dest-cpu=arm64 \
             --dest-os=android \
             --cross-compiling \
-            --without-inspector
+            --without-inspector \
+            --with-android-ndk=$NDK_PATH
           
           make -j$(nproc)
           
