@@ -38,7 +38,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r25c  # 使用较老的版本可能更稳定
+          ndk-version: r25c
           add-to-path: true
 
       - name: Set NDK path
@@ -59,10 +59,6 @@ jobs:
         run: |
           cd node
           
-          # 验证 NDK 路径
-          echo "NDK path: $NDK_PATH"
-          ls -la $NDK_PATH
-          
           # 设置交叉编译环境
           TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
           export PATH=$TOOLCHAIN/bin:$PATH
@@ -78,12 +74,7 @@ jobs:
             --dest-cpu=arm64 \
             --dest-os=android \
             --cross-compiling \
-            --without-snapshot \
-            --without-node-snapshot \
-            --without-inspector \
-            --without-dtrace \
-            --without-etw \
-            --without-perfctr
+            --without-inspector
           
           make -j$(nproc)
           
