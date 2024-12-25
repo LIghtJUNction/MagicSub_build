@@ -53,10 +53,10 @@ jobs:
           git checkout ${{ steps.check.outputs.version }}
           
       - name: Configure and Build Node.js
-        if: steps.check.outputs.new_version == 'true'
         env:
           NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
-          GYP_DEFINES: "android_ndk_path=${{ steps.setup-ndk.outputs.ndk-path }}"
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GYP_DEFINES: "target_arch=arm64 v8_target_arch=arm64 android_target_arch=arm64 host_os=linux OS=android"
         run: |
           cd node
           
@@ -72,15 +72,20 @@ jobs:
           
           # 显示环境信息
           echo "NDK_PATH: $NDK_PATH"
+          echo "ANDROID_NDK_ROOT: $ANDROID_NDK_ROOT"
           echo "GYP_DEFINES: $GYP_DEFINES"
+          echo "PATH: $PATH"
+          
+          # 检查工具链
+          which aarch64-linux-android21-clang
+          which aarch64-linux-android21-clang++
           
           # 配置 Node.js
           ./configure \
             --dest-cpu=arm64 \
             --dest-os=android \
             --cross-compiling \
-            --without-inspector \
-            --with-android-ndk=$NDK_PATH
+            --openssl-no-asm
           
           make -j$(nproc)
           
