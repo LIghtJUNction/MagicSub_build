@@ -21,21 +21,21 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-20.04, target_arch: arm }
-          - { os: ubuntu-20.04, target_arch: arm64 }
-          - { os: ubuntu-20.04, target_arch: x86_64 }
+          - { os: ubuntu-24.04, target_arch: arm }
+          - { os: ubuntu-24.04, target_arch: arm64 }
+          - { os: ubuntu-24.04, target_arch: x86_64 }
 
     runs-on: ${{ matrix.config.os }}
     env:
       TARGET_ARCH: ${{ matrix.config.target_arch }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: '0'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v1
+        uses: mozilla-actions/sccache-action@v0.5.3
 
       - name: Install build utils
         run: |
@@ -43,7 +43,7 @@ jobs:
           sudo apt-get install -y gcc-multilib g++-multilib
 
       - name: Setup Android NDK
-        uses: nttld/setup-ndk@v2
+        uses: nttld/setup-ndk@v1.4.1
         id: setup-ndk
         with:
           ndk-version: ${{ env.ANDROID_NDK_VERSION }}
@@ -56,7 +56,7 @@ jobs:
           ./tools/android_build.sh $MY_ANDROID_NDK_HOME $ANDROID_TARGET_SDK_VERSION $TARGET_ARCH
           rm -rf ./out_android/libnode
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v4
         with:
           name: node-android-${{ env.TARGET_ARCH }}
           path: out_android
@@ -85,15 +85,15 @@ jobs:
           sudo rm -rf /usr/local/share/powershell
           sudo find /Applications -type d -name "Xcode_*.app" ! -name "Xcode_$XCODE_VERSION.app" -prune -exec rm -rf "{}" \;
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: '0'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v1
+        uses: mozilla-actions/sccache-action@v0.5.3
 
       - name: Xcode Select Version
-        uses: mobiledevops/xcode-select-version-action@v2
+        uses: mobiledevops/xcode-select-version-action@v1.1.0
         with:
           xcode-select-version: ${{ matrix.config.xcode }}
 
@@ -106,7 +106,7 @@ jobs:
           python3.12 -m pip install setuptools
           ./tools/ios_framework_prepare.sh $TARGET_ARCH
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v4
         with:
           name: node-ios-${{ env.TARGET_ARCH }}
           path: out_ios_${{ env.TARGET_ARCH }}
@@ -116,11 +116,11 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-20.04 }
+          - { os: ubuntu-24.04 }
     runs-on: ${{ matrix.config.os }}
     needs: build-android
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: '0'
 
@@ -130,11 +130,11 @@ jobs:
           sudo apt-get install -y gcc-multilib g++-multilib
 
       - name: Setup Android NDK
-        uses: nttld/setup-ndk@v2
+        uses: nttld/setup-ndk@v1.4.1
         with:
           ndk-version: ${{ env.ANDROID_NDK_VERSION }}
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v4
         with:
           pattern: node-android-*
           merge-multiple: true
@@ -153,7 +153,7 @@ jobs:
           ./tools/copy_libnode_headers.sh android
           cp -R out_android/libnode/include/* artifacts/include
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v4
         with:
           name: nodejs-mobile-android
           path: artifacts
@@ -170,16 +170,16 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     needs: build-ios
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: '0'
 
       - name: Xcode Select Version
-        uses: mobiledevops/xcode-select-version-action@v2
+        uses: mobiledevops/xcode-select-version-action@v1.1.0
         with:
           xcode-select-version: ${{ matrix.config.xcode }}
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v4
         with:
           pattern: node-ios-*
           merge-multiple: true
@@ -205,7 +205,7 @@ jobs:
           ./tools/copy_libnode_headers.sh ios
           cp -R out_ios/libnode/include/* artifacts/include
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v4
         with:
           name: nodejs-mobile-ios
           path: artifacts
