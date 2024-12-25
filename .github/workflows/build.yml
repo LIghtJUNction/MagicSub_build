@@ -35,12 +35,11 @@ jobs:
           sudo apt-get install -y python3 g++ make python3-pip
           
       - name: Setup Android NDK
-        if: steps.check.outputs.new_version == 'true'
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r27c
-          add-to-path: false
+          ndk-version: r25c  # 使用较老的版本可能更稳定
+          add-to-path: true
 
       - name: Set NDK path
         if: steps.check.outputs.new_version == 'true'
@@ -56,21 +55,35 @@ jobs:
       - name: Configure and Build Node.js
         if: steps.check.outputs.new_version == 'true'
         env:
-          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
-          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+          NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           cd node
-          export PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-          export CC=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang
-          export CXX=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++
-          export LINK=$CXX
           
+          # 验证 NDK 路径
+          echo "NDK path: $NDK_PATH"
+          ls -la $NDK_PATH
+          
+          # 设置交叉编译环境
+          TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
+          export PATH=$TOOLCHAIN/bin:$PATH
+          export CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
+          export CXX=$TOOLCHAIN/bin/aarch64-linux-android21-clang++
+          export LINK=$CXX
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          
+          # 配置 Node.js
           ./configure \
             --dest-cpu=arm64 \
             --dest-os=android \
             --cross-compiling \
-            --openssl-no-asm \
-            --with-android-ndk=$ANDROID_NDK_ROOT
+            --without-snapshot \
+            --without-node-snapshot \
+            --without-inspector \
+            --without-dtrace \
+            --without-etw \
+            --without-perfctr
           
           make -j$(nproc)
           
