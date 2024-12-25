@@ -56,14 +56,22 @@ jobs:
       - name: Configure and Build Node.js
         if: steps.check.outputs.new_version == 'true'
         env:
-          ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           cd node
+          export PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          export CC=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang
+          export CXX=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++
+          export LINK=$CXX
+          
           ./configure \
             --dest-cpu=arm64 \
             --dest-os=android \
             --cross-compiling \
-            --android-ndk-path=$ANDROID_NDK_HOME
+            --openssl-no-asm \
+            --with-android-ndk=$ANDROID_NDK_ROOT
+          
           make -j$(nproc)
           
       - name: Strip binary
