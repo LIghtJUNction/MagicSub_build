@@ -4,6 +4,11 @@ on:
   workflow_dispatch:  # 允许手动触发
   schedule:
     - cron: '0 */6 * * *'  # 每6小时检查一次
+  push:
+    paths:
+      - '.github/workflows/build.yml'  # 当工作流文件更改时触发
+    branches:
+      - master
   
 jobs:
   check-and-build:
@@ -32,9 +37,15 @@ jobs:
       - name: Setup Android NDK
         if: steps.check.outputs.new_version == 'true'
         uses: nttld/setup-ndk@v1
+        id: setup-ndk
         with:
-          ndk-version: r25c
-          
+          ndk-version: r27c
+          add-to-path: false
+
+      - name: Set NDK path
+        if: steps.check.outputs.new_version == 'true'
+        run: echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+
       - name: Clone Node.js repository
         if: steps.check.outputs.new_version == 'true'
         run: |
@@ -43,11 +54,16 @@ jobs:
           git checkout ${{ steps.check.outputs.version }}
           
       - name: Configure and Build Node.js
+        if: steps.check.outputs.new_version == 'true'
         env:
           ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk
         run: |
           cd node
-          ./configure --dest-cpu=arm64 --dest-os=android --cross-compiling
+          ./configure \
+            --dest-cpu=arm64 \
+            --dest-os=android \
+            --cross-compiling \
+            --android-ndk-path=$ANDROID_NDK_HOME
           make -j$(nproc)
           
       - name: Strip binary
