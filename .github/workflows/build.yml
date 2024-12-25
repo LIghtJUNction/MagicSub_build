@@ -1,97 +1,69 @@
-name: Build Linux ARM64 Binary
+name: Build Node.js for Android ARM64
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - master
+  workflow_dispatch:  # 允许手动触发
   schedule:
-    - cron: '0 0 * * *'
-
+    - cron: '0 */6 * * *'  # 每6小时检查一次
+  
 jobs:
-  build:
+  check-and-build:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Install dependencies
+      - uses: actions/checkout@v4
+      
+      - name: Check latest Node.js version
+        id: check
+        run: |
+          LATEST_TAG=$(curl -s https://api.github.com/repos/nodejs/node/releases/latest | jq -r .tag_name)
+          LOCAL_TAG=$(cat .last_built_version 2>/dev/null || echo "none")
+          if [ "$LATEST_TAG" != "$LOCAL_TAG" ]; then
+            echo "new_version=true" >> $GITHUB_OUTPUT
+            echo "$LATEST_TAG" > .last_built_version
+            echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Setup build environment
+        if: steps.check.outputs.new_version == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            nodejs \
-            npm \
-            wget \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu \
-            python3 \
-            python3-pip \
-            python-is-python3 \
-            make \
-            build-essential
+          sudo apt-get install -y python3 g++ make python3-pip
           
-      - name: Setup build environment
+      - name: Setup Android NDK
+        if: steps.check.outputs.new_version == 'true'
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+          
+      - name: Clone Node.js repository
+        if: steps.check.outputs.new_version == 'true'
         run: |
-          # 验证 Python 版本
-          python3 --version
+          git clone https://github.com/nodejs/node.git
+          cd node
+          git checkout ${{ steps.check.outputs.version }}
           
-          # 设置交叉编译环境变量
-          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
-          echo "CFLAGS=-fPIE -pie" >> $GITHUB_ENV
-          echo "CXXFLAGS=-fPIE -pie" >> $GITHUB_ENV
-          echo "LDFLAGS=-pie" >> $GITHUB_ENV
-          echo "PKG_CACHE_PATH=$(pwd)/.pkg-cache" >> $GITHUB_ENV
-          echo "NODE_OPTIONS=--max-old-space-size=4096" >> $GITHUB_ENV
-          echo "PYTHON=$(which python3)" >> $GITHUB_ENV
-          
-      - name: Download sub-store bundle
+      - name: Configure and Build Node.js
+        env:
+          ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk
         run: |
-          wget https://github.com/sub-store-org/Sub-Store/releases/download/2.14.445/sub-store.bundle.js
+          cd node
+          ./configure --dest-cpu=arm64 --dest-os=android --cross-compiling
+          make -j$(nproc)
           
-      - name: Install pkg
+      - name: Strip binary
         run: |
-          npm install -g pkg
+          cd node
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip out/Release/node
           
-      - name: Build PIE binary
-        run: |
-          # 显示环境变量
-          env
-          
-          # 构建
-          pkg sub-store.bundle.js \
-            --targets node16-linux-arm64 \
-            --output sub-store-static \
-            --options experimental-enable-musl=true \
-            --no-bytecode --public-packages "*" --public \
-            --build
-            
-      - name: Patch binary
-        run: |
-          sudo apt-get install -y patchelf
-          patchelf --set-interpreter /apex/com.android.runtime/bin/linker64 sub-store-static
-          patchelf --set-rpath /apex/com.android.runtime/lib64 sub-store-static
-          
-      - name: Check binary details
-        run: |
-          echo "=== File Type ==="
-          file sub-store-static
-          
-          echo -e "\n=== File Permissions ==="
-          ls -l sub-store-static
-          
-          echo -e "\n=== ELF Headers ==="
-          readelf -h sub-store-static || true
-          
-          echo -e "\n=== Dynamic Section ==="
-          readelf -d sub-store-static || true
-          
-          echo -e "\n=== Program Headers ==="
-          readelf -l sub-store-static || true
-          
-          echo -e "\n=== Interpreter ==="
-          readelf -p .interp sub-store-static || true
-          
-          echo -e "\n=== Shared Libraries ==="
-          ldd sub-store-static || true
-          
-          echo -e "\n=== File Size ==="
-          du -h sub-store-static || true
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            node/out/Release/node
+          name: Node.js for Android ARM64
+          body: Automated build of Node.js for Android ARM64
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
